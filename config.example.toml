@@ -1,0 +1,107 @@
+# Astro Rig Monitor settings: every option, with examples.
+#
+# The easy way to make your own:  python -m arm setup   (asks questions, writes config.toml)
+# Or copy this file to config.toml (which git ignores) and edit it.
+# Full explanations: docs/configuration.md
+
+bridge_id = "main"
+log_file = "arm.log"     # rotating log; leave out to log to the console only
+
+# ---- What shows the alerts: turn on any of these by keeping its [section] line ------------------
+
+# Web page with the live status of every rig: http://<this computer>:8080
+[web]
+port = 8080
+# host = "127.0.0.1"          # this computer only (default "0.0.0.0": the whole home network)
+
+# Record every night and build a report page each morning, linked from the web page.
+[report]
+at = "08:00"                  # local time to build last night's report
+keep_days = 30                # recordings and reports older than this are deleted
+
+# Phone / chat alerts. ntfy: install the free ntfy app and subscribe to your topic name.
+# Anyone who knows the topic name can read it, so make it long and random (setup does this).
+# [notify]
+# level = "alert"             # "alert", or "warn" to hear about WARN too
+# clear = true                # also say when a rig is back to normal or finished
+# repeat_min = 0              # remind every N minutes while a rig stays in ALERT (0 = never)
+# ntfy_url = "https://ntfy.sh/arm-change-me-to-something-long"
+# ntfy_token = "tk_..."       # only for a protected topic or your own ntfy server
+# discord_webhook = "https://discord.com/api/webhooks/..."
+
+# MQTT broker, for an ESP32 display or Home Assistant (docs/mqtt-spec.md). Not needed otherwise.
+# [mqtt]
+# host = "127.0.0.1"
+# port = 1883
+# prefix = "arm"             # every topic starts with this
+# username = "arm"
+# password = "..."
+# tls = true
+# ca_file = "ca.crt"
+
+# ---- Rigs --------------------------------------------------------------------------------------
+
+# Applied to every rig unless the rig sets its own value. Defaults shown.
+[defaults]
+port = 4400                 # ASIAIR and PHD2 both send guiding events on 4400
+warn = 0.80                 # total RMS (arcsec) above this -> WARN
+alert = 1.20                # total RMS (arcsec) above this -> ALERT
+hysteresis = 0.05           # must fall this far below an edge to leave a band
+persist_s = 20              # a new RMS band must hold this long (one bad frame never alerts)
+stopped_grace_s = 20        # guiding stopped / star lost longer than this -> ALERT
+offline_grace_s = 30        # rig unreachable longer than this while armed -> ALERT
+frame_timeout_s = 30        # guiding but no frames for this long -> ALERT
+task_limit_s = 600          # calibration etc. longer than this -> ALERT
+settle_fail_limit = 3       # failed settles in a row -> ALERT
+screen_method = "stdev"     # figure shown: "stdev" (PHD2 / ASIAIR style) or "rms" (about zero, NINA style)
+screen_window = 50          # frames in the figure shown; match your guide graph's length
+screen_dithers = true       # include dither/settle frames in the figure shown, as ASIAIR does
+alert_method = "stdev"      # figure the alert levels use
+alert_window = 30           # frames, with dithers and settling left out
+# lat = 51.5                # site position, town-level is plenty: a rig that has stopped guiding
+# lon = -0.1                #   as the sun rises disarms itself instead of alerting all morning
+
+# An ASIAIR. It reports guiding in arcsec at its own guide scale, so no scale is needed.
+[rigs.refractor]
+name = "Refractor"
+host = "192.168.1.50"         # give each ASIAIR a fixed address (a DHCP reservation on the router)
+dialect = "asiair"
+units = "arcsec"
+planned_stop_grace_s = 600    # the plan pauses guiding for gotos, autofocus and flips: alert if not back in 10 min
+filter_wheel = true           # mono camera: pauses with no slew may be filter changes (night report labels)
+warn = 0.80
+alert = 1.20
+
+# A second ASIAIR with a one-shot colour camera and looser levels.
+[rigs.widefield]
+name = "Widefield"
+host = "192.168.1.51"
+dialect = "asiair"
+units = "arcsec"
+planned_stop_grace_s = 600
+filter_wheel = false
+warn = 1.00
+alert = 1.50
+# sky_image_url = "http://allsky.local/current/tmp/image.jpg"   # all-sky camera image, fetched every sky_every_s
+# sky_every_s = 120
+
+# PHD2 run by NINA, e.g. at a remote observatory over Tailscale. PHD2 reports pixels, so give the
+# guide scale: guide_scale in arcsec/px, or guide_pixel_um + guide_focal_mm (+ guide_binning).
+[rigs.observatory]
+enabled = false               # remove this line to use it
+name = "Observatory"
+host = "100.64.0.10"          # its Tailscale address
+dialect = "phd2"
+units = "pixels"
+guide_pixel_um = 3.75
+guide_focal_mm = 200
+guide_binning = 1
+warn = 1.00
+alert = 1.50
+screen_method = "rms"         # NINA's guider panel shows RMS about zero
+alert_method = "rms"
+screen_dithers = false        # NINA dithers are large and would swamp the figure shown
+frame_timeout_s = 60          # PHD2 pauses while NINA downloads each image
+planned_stop_grace_s = 300    # NINA stops guiding for autofocus, flips and target changes
+# lat = -30.0
+# lon = 22.0

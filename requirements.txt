@@ -1,0 +1,3 @@
+paho-mqtt>=2,<3
+pillow>=10            # only for rigs with sky_image_url
+certifi               # HTTPS root certificates for sky images and notifications

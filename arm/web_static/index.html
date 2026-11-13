@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111110">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Guiding">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Astro Rig Monitor</title>
+<style>
+:root {
+  --bg: #111110; --row: #1c1c1b; --row-alert: #501313; --line: #2c2c2a;
+  --text: #f1efe8; --text2: #b4b2a9; --muted: #888780; --grey: #5f5e5a;
+  --green: #639922; --green-lt: #97c459;
+  --amber: #ef9f27; --amber-lt: #fac775; --amber-dk: #854f0b;
+  --red: #e24b4a; --red-lt: #f7c1c1; --red-dk: #a32d2d;
+  --ra: #378add; --dec: #d85a30;
+  --gutter: max(16px, env(safe-area-inset-left));
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased; min-height: 100vh;
+  padding: env(safe-area-inset-top) var(--gutter) calc(16px + env(safe-area-inset-bottom));
+}
+html.night body { filter: sepia(1) saturate(9) hue-rotate(-50deg) brightness(.62) contrast(1.1); }
+button { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* top bar */
+header { display: flex; align-items: center; gap: 12px; padding: 14px 0 10px; }
+header h1 { font-size: 17px; font-weight: 600; margin: 0; flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+header h1 .back { display: none; border: 0; background: none; padding: 4px 8px 4px 0; font-size: 22px; line-height: 1; color: var(--text2); cursor: pointer; }
+body.detail header h1 .back { display: block; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--grey); flex: none; }
+.dot.on { background: var(--green); }
+.dot.off { background: var(--red); animation: blink 1s steps(2) infinite; }
+.status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.tools { display: flex; gap: 6px; }
+.tool { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 5px 9px; font-size: 13px; color: var(--text2); cursor: pointer; }
+.tool[aria-pressed="true"] { border-color: var(--text2); color: var(--text); }
+.tool[hidden] { display: none; }
+@media (max-width: 480px) { #connText { display: none; } header h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+
+.banner { display: none; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--row-alert); color: var(--red-lt); font-weight: 600; }
+.banner.show { display: block; }
+
+/* overview */
+#rigs { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { #rigs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }   /* never more than 2 across: 4 rigs = 2 x 2 */
+.rig {
+  display: grid; grid-template-columns: 6px 1fr auto; gap: 0 14px; align-items: stretch;
+  background: var(--row); border-radius: 12px; overflow: hidden; cursor: pointer;
+  border: 1px solid transparent; text-align: left; padding: 0; width: 100%;
+}
+.rig:hover { border-color: var(--line); }
+.rig:focus-visible { outline: 2px solid var(--text2); outline-offset: 2px; }
+.rig.alert { background: var(--row-alert); }
+.stripe { background: var(--grey); }
+.rig.ok .stripe { background: var(--green); }
+.rig.warn .stripe { background: var(--amber); }
+.rig.alert .stripe { background: var(--red); animation: blink 0.5s steps(2) infinite; }
+.rig .main { padding: 12px 0; min-width: 0; }
+.rig .name { font-size: 16px; font-weight: 650; display: flex; align-items: baseline; gap: 8px; }
+.rig .state { font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rig.warn .state { color: var(--amber-lt); }
+.rig.alert .state { color: var(--red-lt); font-weight: 600; }
+.rig .sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.rig .sub b { font-weight: 500; color: var(--text2); }
+.rig .ra b { color: var(--ra); }
+.rig .dec b { color: var(--dec); }
+.rig .right { padding: 10px 14px 10px 0; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 6px; }
+.big { font-size: 30px; font-weight: 650; line-height: 1; letter-spacing: -0.5px; }
+.big small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 1px; }
+.lv-ok .big, .big.lv-ok { color: var(--green-lt); }
+.lv-warn .big, .big.lv-warn { color: var(--amber-lt); }
+.lv-alert .big, .big.lv-alert { color: var(--red-lt); }
+.lv-idle .big, .big.lv-idle { color: var(--text2); }
+canvas.spark { width: 120px; height: 34px; display: block; }
+.disarmed { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; font-weight: 500; }
+
+/* detail */
+#detail { display: none; }
+body.detail #overview { display: none; }
+body.detail #detail { display: block; }
+.dhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.badge { font-size: 12px; font-weight: 700; letter-spacing: .5px; border-radius: 6px; padding: 3px 8px; background: var(--line); color: var(--text2); text-transform: uppercase; }
+.badge.ok { background: var(--green); color: #fff; }
+.badge.warn { background: var(--amber); color: #2a1a00; }
+.badge.alert { background: var(--red); color: #fff; animation: blink 0.5s steps(2) infinite; }
+.dstate { color: var(--text2); }
+.panel { background: var(--row); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.graph-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; gap: 10px; flex-wrap: wrap; }
+.legend span { margin-left: 10px; white-space: nowrap; }
+.legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+canvas.graph { width: 100%; height: 220px; display: block; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px 16px; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font-size: 17px; font-weight: 600; }
+.stat .v small { font-size: 12px; color: var(--muted); font-weight: 500; }
+.cols { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .cols { grid-template-columns: 1.4fr 1fr; } .cols.nosky { grid-template-columns: 1fr; } }
+.sky[hidden] { display: none; }
+.sky img { width: 100%; height: auto; display: block; border-radius: 8px; background: #000; }
+.sky .none { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
+.sky .cap { font-size: 12px; color: var(--muted); margin-top: 6px; }
+footer { color: var(--grey); font-size: 12px; margin-top: 18px; text-align: center; }
+.reports { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.reports a { color: var(--text2); text-decoration: none; border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; }
+.reports a:hover, .reports a:focus-visible { border-color: var(--text2); color: var(--text); outline: none; }
+.reports a.latest { color: var(--text); border-color: var(--grey); }
+body.detail .reports { display: none; }
+/* Desktop: same layout, scaled up so it reads from across the room. Phones and tablets
+   (under 1100 px) keep the sizes above. */
+@media (min-width: 1100px) {
+  :root { --gfont: 13px; }
+  body { font-size: 17px; padding: 8px 32px 32px; }
+  header { padding: 22px 0 18px; gap: 16px; }
+  header h1 { font-size: 24px; }
+  header h1 .back { font-size: 30px; }
+  .status { font-size: 15px; }
+  .dot { width: 11px; height: 11px; }
+  .tool { font-size: 15px; padding: 7px 14px; border-radius: 10px; }
+  .banner { font-size: 18px; padding: 14px 18px; }
+  #rigs { gap: 18px; }
+  /* The overview fills the window like a wall dashboard; the figures grow with the card. */
+  body:not(.detail) { display: flex; flex-direction: column; height: 100vh; min-height: 520px; }
+  body:not(.detail) #overview { flex: 1; display: flex; min-height: 0; }
+  body:not(.detail) #rigs { flex: 1; grid-auto-rows: minmax(150px, 1fr); }
+  body:not(.detail) .rig { container-type: size; }
+  body:not(.detail) .rig .main { padding: 4cqh 0; }
+  body:not(.detail) .rig .name { font-size: clamp(26px, 9cqh, 44px); }
+  body:not(.detail) .rig .state { font-size: clamp(18px, 6cqh, 28px); }
+  body:not(.detail) .rig .sub { font-size: clamp(16px, 5cqh, 24px); margin-top: 4cqh; }
+  body:not(.detail) .rig .right { justify-content: center; gap: 4cqh; padding-right: 3cqw; }
+  body:not(.detail) .big { font-size: clamp(64px, 30cqh, 170px); letter-spacing: -0.02em; }
+  body:not(.detail) .big small { font-size: 0.4em; }
+  body:not(.detail) canvas.spark { width: clamp(260px, 26cqw, 520px); height: clamp(64px, 22cqh, 160px); }
+  body:not(.detail) footer { margin-top: 12px; }
+  .rig { grid-template-columns: 10px 1fr auto; gap: 0 22px; border-radius: 16px; min-height: 150px; }
+  .rig .main { padding: 22px 0; display: flex; flex-direction: column; justify-content: center; }
+  .rig .name { font-size: 26px; }
+  .rig .state { font-size: 18px; margin-top: 2px; }
+  .rig .sub { font-size: 16px; margin-top: 12px; gap: 6px 20px; }
+  .rig .right { padding: 20px 24px 20px 0; gap: 12px; }
+  .big { font-size: 64px; letter-spacing: -1.5px; }
+  .big small { font-size: 26px; }
+  canvas.spark { width: 260px; height: 64px; }
+  .disarmed { font-size: 13px; padding: 1px 7px; }
+  .dhead { gap: 16px; margin-bottom: 16px; }
+  .badge { font-size: 15px; padding: 5px 12px; border-radius: 8px; }
+  .dstate { font-size: 20px; }
+  .panel { padding: 20px; border-radius: 16px; margin-bottom: 18px; }
+  .cols { gap: 18px; }
+  .graph-head { font-size: 15px; margin-bottom: 10px; }
+  .legend i { width: 14px; height: 4px; }
+  canvas.graph { height: 400px; }
+  .stats { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 20px 24px; }
+  .stat .k { font-size: 14px; }
+  .stat .v { font-size: 26px; }
+  .stat .v small { font-size: 15px; }
+  .sky .cap { font-size: 15px; margin-top: 10px; }
+  footer { font-size: 14px; }
+}
+/* Very large screens (2K/4K monitors, TVs): another step up */
+@media (min-width: 1800px) {
+  :root { --gfont: 15px; }
+  body { font-size: 19px; padding: 8px 48px 40px; }
+  header h1 { font-size: 30px; }
+  #rigs { gap: 24px; }
+  canvas.graph { height: 520px; }
+  .stat .v { font-size: 32px; }
+  .stat .k { font-size: 16px; }
+}
+@keyframes blink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><button class="back" id="back" aria-label="Back to all rigs">‹</button><span id="title">Astro Rig Monitor</span></h1>
+  <div class="status"><span class="dot" id="conn"></span><span id="connText">Connecting…</span></div>
+  <div class="tools">
+    <button class="tool" id="wake" aria-pressed="false" hidden title="Stop this screen going to sleep">Keep on</button>
+    <button class="tool" id="night" aria-pressed="false" title="Red night view">Night</button>
+  </div>
+</header>
+<div class="banner" id="banner"></div>
+
+<main id="overview"><div id="rigs"></div></main>
+
+<main id="detail">
+  <div class="dhead"><span class="badge" id="dBadge">—</span><span class="dstate" id="dState"></span></div>
+  <div class="cols">
+    <div>
+      <div class="panel">
+        <div class="graph-head">
+          <span id="gTitle">Last 100 frames</span>
+          <span class="legend"><span><i style="background:var(--ra)"></i>RA</span><span><i style="background:var(--dec)"></i>Dec</span><span><i style="background:#ffffff22;height:9px"></i>dither / settle</span></span>
+        </div>
+        <canvas class="graph" id="graph"></canvas>
+      </div>
+      <div class="panel"><div class="stats" id="stats"></div></div>
+    </div>
+    <div class="panel sky" id="sky" hidden></div>
+  </div>
+</main>
+<nav class="reports" id="reports" hidden aria-label="Night reports"></nav>
+<footer id="foot">Read-only view of the guiding bridge</footer>
+
+<script>
+"use strict";
+const STALE_S = 30;            // same as the display: no rig update this long -> stale
+const BRIDGE_TIMEOUT_S = 30;   // no heartbeat this long -> bridge offline
+const HISTORY_MAX = 100;
+const STATE_LABEL = { guiding: "Guiding", dithering: "Dithering", settling: "Settling", star_lost: "Star lost",
+  stopped: "Stopped", paused: "Paused", looping: "Looping", calibrating: "Calibrating", busy: "Busy",
+  idle: "Idle", unknown: "No data" };
+const SEV = { idle: 0, ok: 1, warn: 2, alert: 3 };
+
+const rigs = new Map();         // id -> {id, name, state, rx, trend, hist:[{n,ra,dec,d}], sky, skyInfo, el}
+let order = [];
+let lastBeat = 0, connected = false, everConnected = false, openRig = null;
+
+const $ = (id) => document.getElementById(id);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const gscale = () => (parseFloat(css("--gfont")) || 11) / 11;   // canvas text and lines grow with the desktop layout
+const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : Number(v).toFixed(d);
+const nowS = () => Date.now() / 1000;
+function elapsed(s) {
+  if (s < 0) s = 0;
+  if (s < 60) return Math.round(s) + " s";
+  if (s < 3600) return Math.floor(s / 60) + " m";
+  return Math.floor(s / 3600) + " h " + Math.floor((s % 3600) / 60) + " m";
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+// ---- what a rig shows ----
+function bridgeOnline() { return connected && nowS() - lastBeat < BRIDGE_TIMEOUT_S; }
+function effective(r) {
+  const s = r.state;
+  if (!s) return { level: "idle", note: "Waiting for data" };
+  const armed = !!s.armed;
+  if (!bridgeOnline() && everConnected) return { level: armed ? "alert" : "idle", note: "No bridge", stale: true };
+  if (nowS() - r.rx > STALE_S) return { level: armed ? "alert" : "idle", note: "No data " + elapsed(nowS() - r.rx), stale: true };
+  return { level: s.level || "idle" };
+}
+function stateText(r, e) {
+  const s = r.state;
+  if (!s) return "Waiting for data";
+  if (e.note) return e.note;
+  if (!s.armed && s.ended) return (s.ended === "plan" ? "Plan finished" : "Finished at dawn") + " · " + elapsed(nowS() - s.since) + " ago";
+  if ((e.level === "warn" || e.level === "alert") && s.reason_text)
+    return s.reason_text + " · " + elapsed(nowS() - s.since);
+  if (s.link === "down") return "Rig offline";
+  if (s.state === "busy" && s.task) return s.task;
+  let t = STATE_LABEL[s.state] || s.state;
+  if (s.state === "guiding" && s.guiding_since) t += " · " + elapsed(nowS() - s.guiding_since);
+  return t;
+}
+
+// ---- overview ----
+function buildRows() {
+  const box = $("rigs");
+  box.textContent = "";
+  for (const id of order) {
+    const r = rigs.get(id);
+    const el = document.createElement("button");
+    el.className = "rig idle";
+    el.innerHTML = `<div class="stripe"></div>
+      <div class="main"><div class="name"><span class="nm"></span><span class="disarmed" hidden>Disarmed</span></div>
+        <div class="state"></div>
+        <div class="sub num"><span class="ra">RA <b>–</b></span><span class="dec">Dec <b>–</b></span><span class="snr">SNR <b>–</b></span><span class="age"></span></div></div>
+      <div class="right"><div class="big num">–</div><canvas class="spark"></canvas></div>`;
+    el.querySelector(".nm").textContent = r.name;
+    el.addEventListener("click", () => { fromOverview = true; location.hash = "rig=" + encodeURIComponent(id); });
+    r.el = el;
+    box.appendChild(el);
+  }
+}
+function drawRow(r) {
+  const el = r.el; if (!el) return;
+  const s = r.state || {}, e = effective(r), sc = s.screen;
+  el.className = "rig " + e.level + " lv-" + e.level;
+  el.querySelector(".state").textContent = stateText(r, e);
+  el.querySelector(".disarmed").hidden = !(r.state && !s.armed && !s.ended && s.state && s.state !== "idle");
+  const big = el.querySelector(".big");
+  big.innerHTML = sc ? `${fmt(sc.total)}<small>″</small>` : "–";
+  el.querySelector(".ra b").textContent = sc ? fmt(sc.ra) : "–";
+  el.querySelector(".dec b").textContent = sc ? fmt(sc.dec) : "–";
+  el.querySelector(".snr b").textContent = s.snr != null ? Math.round(s.snr) : "–";
+  el.querySelector(".age").textContent = s.last_frame_ts ? "frame " + elapsed(nowS() - s.last_frame_ts) + " ago" : "";
+  el.setAttribute("aria-label", `${r.name}: ${stateText(r, e)}, total ${sc ? fmt(sc.total) : "no data"}`);
+  drawSpark(el.querySelector("canvas"), r);
+}
+function sizeCanvas(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  return [g, w, h];
+}
+function drawSpark(c, r) {
+  const [g, w, h] = sizeCanvas(c);
+  const pts = (r.trend && r.trend.total) || [];
+  const th = (r.state && r.state.thresholds) || { warn: 0.8, alert: 1.0 };
+  const vals = pts.filter((v) => v !== null);
+  const top = Math.max(th.alert * 1.25, ...vals, 0.1);
+  const y = (v) => h - 2 - (v / top) * (h - 4);
+  const k = gscale();
+  g.setLineDash([3 * k, 3 * k]); g.lineWidth = k;
+  for (const [v, col] of [[th.warn, css("--amber-dk")], [th.alert, css("--red-dk")]]) {
+    g.strokeStyle = col; g.beginPath(); g.moveTo(0, y(v)); g.lineTo(w, y(v)); g.stroke();
+  }
+  g.setLineDash([]);
+  if (!pts.length) return;
+  const step = w / Math.max(pts.length - 1, 1);
+  g.strokeStyle = css("--text2"); g.lineWidth = 1.6 * k; g.lineJoin = "round"; g.beginPath();
+  let pen = false;
+  pts.forEach((v, i) => {
+    if (v === null) { pen = false; return; }
+    const x = i * step, yy = y(Math.min(v, top));
+    pen ? g.lineTo(x, yy) : g.moveTo(x, yy); pen = true;
+  });
+  g.stroke();
+}
+
+// ---- detail ----
+function openDetail(id) {
+  openRig = rigs.has(id) ? id : null;
+  if (!openRig) fromOverview = false;
+  document.body.classList.toggle("detail", !!openRig);
+  $("title").textContent = openRig ? rigs.get(openRig).name : "Astro Rig Monitor";
+  if (openRig) { drawDetail(); drawSky(); }
+  window.scrollTo(0, 0);
+}
+function stat(k, v, unit = "") { return `<div class="stat"><div class="k">${esc(k)}</div><div class="v num">${v}${unit && v !== "–" ? `<small> ${unit}</small>` : ""}</div></div>`; }
+function drawDetail() {
+  const r = rigs.get(openRig); if (!r) return;
+  const s = r.state || {}, e = effective(r), sc = s.screen, th = s.thresholds || {};
+  const b = $("dBadge"); b.className = "badge " + e.level; b.textContent = e.level === "idle" ? (s.ended ? "Done" : s.armed === false && s.state && s.state !== "idle" ? "Disarmed" : "Idle") : e.level;
+  $("dState").textContent = stateText(r, e);
+  $("gTitle").textContent = `Last ${r.hist.length || HISTORY_MAX} frames`;
+  const snr = s.snr != null ? Math.round(s.snr) + (s.snr_trend && s.snr_trend !== "steady" ? ` <small>${esc(s.snr_trend)}</small>` : "") : "–";
+  $("stats").innerHTML =
+    stat("Total RMS", sc ? fmt(sc.total) : "–", "″") +
+    stat("RA", sc ? `<span style="color:var(--ra)">${fmt(sc.ra)}</span>` : "–", "″") +
+    stat("Dec", sc ? `<span style="color:var(--dec)">${fmt(sc.dec)}</span>` : "–", "″") +
+    stat("Peak", sc ? fmt(sc.peak) : "–", "″") +
+    stat("Alert figure", s.alert_total != null ? fmt(s.alert_total) : (s.last_good_total != null ? `<small>last</small> ${fmt(s.last_good_total)}` : "–"), "″") +
+    stat("Warn / alert", th.warn != null ? `${fmt(th.warn)} / ${fmt(th.alert)}` : "–", "″") +
+    stat("SNR", snr) +
+    stat("Star mass", s.star_mass != null ? Math.round(s.star_mass).toLocaleString() : "–") +
+    stat("Guiding for", s.guiding_since && s.state === "guiding" ? elapsed(nowS() - s.guiding_since) : "–") +
+    stat("Dithers", s.dithers ?? "–") +
+    stat("Failed settles", s.settle_fails ?? "–") +
+    stat("Alerts", s.armed ? "Armed" : "Off");
+  drawGraph(r);
+}
+function drawGraph(r) {
+  const [g, w, h] = sizeCanvas($("graph"));
+  const hist = r.hist.slice(-HISTORY_MAX);
+  const k = gscale();
+  const padL = 30 * k, padR = 6, padT = 6 * k, padB = 6 * k, gw = w - padL - padR, gh = h - padT - padB;
+  const peak = Math.max(1, ...hist.map((p) => Math.max(Math.abs(p.ra), Math.abs(p.dec))));
+  const lim = [1, 2, 3, 5, 10].find((v) => v >= peak) || 10;
+  const y = (v) => padT + gh / 2 - (Math.max(-lim, Math.min(lim, v)) / lim) * (gh / 2);
+  const x = (i) => padL + (hist.length > 1 ? (i / (HISTORY_MAX - 1)) * gw : 0);
+  g.font = `${11 * k}px -apple-system, sans-serif`; g.fillStyle = css("--muted"); g.textAlign = "right"; g.textBaseline = "middle";
+  g.lineWidth = k; g.strokeStyle = css("--line");
+  for (const v of [lim, lim / 2, 0, -lim / 2, -lim]) {
+    g.beginPath(); g.moveTo(padL, y(v)); g.lineTo(w - padR, y(v)); g.stroke();
+    g.fillText((v > 0 ? "+" : "") + (Number.isInteger(v) ? v : v.toFixed(1)), padL - 5 * k, y(v));
+  }
+  const colW = gw / (HISTORY_MAX - 1);
+  g.fillStyle = "rgba(255,255,255,0.09)";
+  hist.forEach((p, i) => { if (p.d) g.fillRect(x(i) - colW / 2, padT, colW, gh); });
+  for (const [key, col] of [["ra", css("--ra")], ["dec", css("--dec")]]) {
+    g.strokeStyle = col; g.lineWidth = 1.6 * k; g.lineJoin = "round"; g.beginPath();
+    hist.forEach((p, i) => (i ? g.lineTo(x(i), y(p[key])) : g.moveTo(x(i), y(p[key]))));
+    g.stroke();
+  }
+  if (!hist.length) { g.textAlign = "center"; g.fillStyle = css("--muted"); g.fillText("No guide frames yet", padL + gw / 2, padT + gh / 2 - 14 * k); }
+}
+function drawSky() {
+  const r = rigs.get(openRig); if (!r) return;
+  const box = $("sky");
+  box.hidden = !r.skyAt;
+  document.querySelector(".cols").classList.toggle("nosky", !r.skyAt);
+  if (!r.skyAt) { box.textContent = ""; return; }
+  let img = box.querySelector("img");
+  if (!img) { box.innerHTML = `<img alt="All-sky camera"><div class="cap"></div>`; img = box.querySelector("img"); }
+  const src = `sky/${encodeURIComponent(r.id)}.jpg?at=${r.skyAt}`;
+  if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+  const i = r.skyInfo || {};
+  const t = i.image_ts || i.ts;
+  box.querySelector(".cap").textContent = (i.ok === false ? "Camera not answering · " : "") + (t ? "Image " + elapsed(nowS() - t) + " old" : "");
+}
+
+// ---- data ----
+function rig(id) { return rigs.get(id); }
+function onMessage(m) {
+  if (m.t === "hello") {
+    const known = order.join();
+    for (const x of m.rigs) if (!rigs.has(x.id)) rigs.set(x.id, { id: x.id, name: x.name, state: null, rx: 0, trend: null, hist: [], skyAt: 0, skyInfo: null });
+    order = m.rigs.map((x) => x.id);
+    for (const x of m.rigs) rigs.get(x.id).name = x.name;
+    if (order.join() !== known) buildRows();
+    $("foot").textContent = `Read-only view of the guiding bridge ${m.version}`;
+    if (openRig === null) route();
+    return;
+  }
+  if (m.t === "heartbeat") { lastBeat = nowS(); return; }
+  const r = rig(m.rig); if (!r) return;
+  switch (m.t) {
+    case "state": r.state = m.d; r.rx = nowS(); if (m.d.name) r.name = m.d.name; break;
+    case "trend": r.trend = m.d; break;
+    case "history": {
+      const dith = new Set(m.d.dither || []);
+      r.hist = (m.d.ra || []).map((ra, i) => ({ n: m.d.n0 + i, ra, dec: m.d.dec[i], d: dith.has(m.d.n0 + i) })).slice(-HISTORY_MAX);
+      break;
+    }
+    case "frame": {
+      const last = r.hist[r.hist.length - 1];
+      if (!last || m.d.n > last.n || m.d.n < last.n - 1000) r.hist.push({ n: m.d.n, ra: m.d.ra, dec: m.d.dec, d: m.d.dither || m.d.settling });
+      else { const p = r.hist.find((q) => q.n === m.d.n); if (p) p.d = m.d.dither || m.d.settling; }
+      if (r.hist.length > HISTORY_MAX) r.hist.splice(0, r.hist.length - HISTORY_MAX);
+      break;
+    }
+    case "sky": r.skyAt = m.at; break;
+    case "sky_info": r.skyInfo = m.d; break;
+  }
+  dirty.add(m.rig);
+}
+
+const dirty = new Set();
+function render() {
+  for (const id of order) drawRow(rig(id));    // cheap; also keeps the elapsed times counting
+  if (openRig) { drawDetail(); if (dirty.has(openRig)) drawSky(); }
+  dirty.clear();
+  // connection, banner, title
+  const online = bridgeOnline();
+  $("conn").className = "dot " + (online ? "on" : everConnected ? "off" : "");
+  $("connText").textContent = online ? "Live" : everConnected ? "Bridge not reachable" : "Connecting…";
+  let worst = "idle";
+  for (const id of order) { const lv = effective(rig(id)).level; if (SEV[lv] > SEV[worst]) worst = lv; }
+  const bn = $("banner");
+  bn.classList.toggle("show", everConnected && !online);
+  bn.textContent = "Can't reach the bridge. Rigs that were armed show as alerts until it's back.";
+  document.title = (worst === "alert" ? "⚠ ALERT · " : worst === "warn" ? "WARN · " : "") + "Astro Rig Monitor";
+}
+
+let es = null;
+function connect() {
+  if (es) es.close();
+  es = new EventSource("events");
+  es.onopen = () => { connected = true; everConnected = true; lastBeat = nowS(); };
+  es.onmessage = (ev) => { try { onMessage(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
+  es.onerror = () => { connected = false; };   // EventSource retries by itself
+}
+
+// ---- routing, tools ----
+function route() {
+  const m = location.hash.match(/rig=([^&]+)/);
+  openDetail(m ? decodeURIComponent(m[1]) : null);
+}
+window.addEventListener("hashchange", route);
+// Back: undo our own step if we made one (so the phone's back gesture stays in step), otherwise
+// just close the rig. Opened straight on a rig link, or in an iOS home-screen app, there may be
+// no history to go back to, so close it anyway if going back didn't.
+let fromOverview = false;
+function closeDetail() {
+  history.replaceState(null, "", location.pathname + location.search);
+  openDetail(null);
+}
+$("back").addEventListener("click", () => {
+  if (fromOverview) {
+    fromOverview = false;
+    history.back();
+    setTimeout(() => { if (openRig) closeDetail(); }, 300);
+  } else {
+    closeDetail();
+  }
+});
+
+function setNight(on) {
+  document.documentElement.classList.toggle("night", on);
+  $("night").setAttribute("aria-pressed", on); store("night", on ? "1" : "0");
+}
+$("night").addEventListener("click", () => setNight(!document.documentElement.classList.contains("night")));
+setNight(load("night") === "1");
+
+let lock = null;
+async function setWake(on) {
+  try {
+    if (on) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { if (!document.hidden) $("wake").setAttribute("aria-pressed", "false"); }); }
+    else if (lock) { await lock.release(); lock = null; }
+    $("wake").setAttribute("aria-pressed", on);
+  } catch (e) { $("wake").setAttribute("aria-pressed", "false"); }
+}
+if ("wakeLock" in navigator) {
+  $("wake").hidden = false;
+  $("wake").addEventListener("click", () => setWake($("wake").getAttribute("aria-pressed") !== "true"));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && $("wake").getAttribute("aria-pressed") === "true") setWake(true); });
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && (!es || es.readyState === 2)) connect(); });
+window.addEventListener("resize", () => dirty.add(openRig));
+
+async function loadReports() {
+  try {
+    const list = await (await fetch("reports.json", { cache: "no-store" })).json();
+    const box = $("reports");
+    const recent = list.filter((r) => r.html).slice(0, 7);
+    box.hidden = !recent.length;
+    box.innerHTML = recent.length ? `<span>Night reports</span>` + recent.map((r, i) =>
+      `<a class="${i ? "" : "latest"}" href="reports/${encodeURIComponent(r.html)}">${esc(r.label)}</a>`).join("") : "";
+  } catch (e) {}
+}
+loadReports();
+setInterval(loadReports, 30 * 60 * 1000);
+
+connect();
+setInterval(render, 1000);
+render();
+</script>
+</body>
+</html>

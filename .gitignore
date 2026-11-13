@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+# your settings: addresses, private links, passwords
+config.toml
+config.local.*
+# what the program writes
+*.log
+*.log.*
+nights/
+reports/
+guide_logs/
