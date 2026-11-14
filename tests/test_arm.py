@@ -1041,7 +1041,7 @@ class Setup(unittest.TestCase):
         import time
         from arm import source
         old = source.CYCLE_S, source.LONG_LIVED_S
-        source.CYCLE_S, source.LONG_LIVED_S = 1.0, 0.2
+        source.CYCLE_S, source.LONG_LIVED_S = 0.6, 0.2
         srv = socket.socket()
         srv.bind(("127.0.0.1", 0))
         srv.listen(4)
@@ -1116,6 +1116,21 @@ class Setup(unittest.TestCase):
         self.assertLessEqual(got[-1] - got[0] + 1 - len(got), 2, "lines were missed")
         self.assertEqual([x for x in sent_to_us if x], [])
         self.assertEqual(m.links[:1], [True])
+
+    def test_links_keep_their_spacing(self):
+        """A link that reconnects right after another waits until it is a spacing apart."""
+        import threading
+        import time
+        from arm import source
+        m = type("M", (), {"s": RigSettings(id="x", host="h", links=2)})()
+        r = source.RigReader(m, threading.Event())
+        now = time.time()
+        r._opened = [None, now - 1.0]                  # link 2 opened 1 s ago
+        self.assertAlmostEqual(r._spacing_wait(0), source.CYCLE_S / 2 - 1.0, delta=0.1)
+        r._opened = [None, now - 6.0]                  # 6 s ago: far enough apart already
+        self.assertEqual(r._spacing_wait(0), 0.0)
+        r._opened = [None, None]                       # no other link up: straight back
+        self.assertEqual(r._spacing_wait(0), 0.0)
 
     def test_links_default_by_dialect(self):
         self.assertEqual(rig().links, 2)

@@ -59,6 +59,7 @@ class RigReader(threading.Thread):
         self.n = max(1, getattr(monitor.s, "links", 1))
         self._lock = threading.Lock()
         self._up = 0                   # links currently connected
+        self._opened = [None] * self.n  # when each link's current connection opened
         self._seen = {}                # line text -> time first heard (only with several links)
 
     def run(self):
@@ -85,13 +86,17 @@ class RigReader(threading.Thread):
                     sock.settimeout(2)
                     _keepalive(sock)
                     (log.debug if quiet else log.info)("%s connected to %s:%s", tag, s.host, s.port)
+                    opened = time.time()
+                    with self._lock:
+                        self._opened[i] = opened
                     self._changed(+1)
                     delay, quiet = 5, False
-                    opened = time.time()
                     try:
                         self._read(sock)
                     finally:
-                        self._changed(-1, routine=True)
+                        with self._lock:
+                            self._opened[i] = None
+                        self._changed(-1)
             except Silent:
                 log.debug("%s no data for %d s, reconnecting", tag, SILENCE_S)
                 quiet = True
@@ -100,6 +105,8 @@ class RigReader(threading.Thread):
                 if opened is not None and time.time() - opened >= LONG_LIVED_S:
                     log.debug("%s %s after %.0f s, reconnecting", tag, e, time.time() - opened)
                     quiet = True
+                    if self.stop.wait(self._spacing_wait(i)):
+                        break
                     continue                                   # routine reset: straight back
                 log.warning("%s %s:%s %s", tag, s.host, s.port, e)
                 quiet = False
@@ -110,7 +117,21 @@ class RigReader(threading.Thread):
                 break
             delay = min(delay * 2, 60)
 
-    def _changed(self, d: int, routine: bool = False):
+    def _spacing_wait(self, i: int) -> float:
+        """Seconds to hold off reconnecting so the links stay spread across the reset cycle.
+
+        Links that open together get reset together, leaving a gap. If another link opened
+        less than half a spacing ago, wait (it is listening meanwhile) until a full spacing
+        after it. With one link, or no other link up, reconnect at once."""
+        if self.n == 1:
+            return 0.0
+        gap = CYCLE_S / self.n
+        now = time.time()
+        with self._lock:
+            recent = [o for j, o in enumerate(self._opened) if j != i and o is not None and now - o < gap / 2]
+        return max(0.0, max(recent) + gap - now) if recent else 0.0
+
+    def _changed(self, d: int):
         with self._lock:
             was = self._up
             self._up += d
