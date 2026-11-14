@@ -7,6 +7,7 @@ See docs/mqtt-spec.md for the meaning of the published fields.
 
 import json
 import math
+import re
 import threading
 from collections import deque
 from dataclasses import dataclass
@@ -30,10 +31,14 @@ REASON_TEXT = {
     "task_too_long": "Task too long",
     "rig_offline": "Rig offline",
     "data_stale": "No guide frames",
+    "asiair_health": "ASIAIR power/heat",
 }
 # When two conditions have the same severity, the earlier reason wins.
 REASON_PRIORITY = ["rig_offline", "data_stale", "star_lost", "stopped",
-                   "task_too_long", "settle_failed", "rms_high"]
+                   "task_too_long", "settle_failed", "asiair_health", "rms_high"]
+
+APP_LINK_STALE_S = 60    # app port (4700) silent this long: forget what it said was running
+FILTER_IN_NAME = re.compile(r"_Bin\d+_[^_]+_([A-Za-z0-9]{1,6})_gain")   # ..._Bin1_533MM_O_gain100_...
 
 APPSTATE_MAP = {
     "Stopped": "stopped", "Selected": "stopped", "Guiding": "guiding",
@@ -54,6 +59,9 @@ class RigSettings:
     name: str = ""
     host: str = ""
     port: int = 4400
+    # ASIAIR only: the app's own port (4700), read-only, for autofocus, filter changes and plan
+    # progress. Unofficial and undocumented: a future ASIAIR firmware could change or close it.
+    app_port: Optional[int] = None
     links: int = 0                   # parallel read-only connections; 0 = auto (2 for ASIAIR, 1 for PHD2)
     dialect: str = "asiair"          # "asiair" (IsDither/IsSettle flags) or "phd2" (events only)
     units: str = "pixels"            # what RADistanceRaw/DECDistanceRaw are in: "pixels" or "arcsec"
@@ -100,6 +108,8 @@ class RigSettings:
             raise ValueError(f"{self.id}: warn must be below alert")
         if self.links == 0:
             self.links = 2 if self.dialect == "asiair" else 1
+        if self.app_port is not None and self.dialect != "asiair":
+            raise ValueError(f"{self.id}: app_port is for ASIAIR rigs only")
         if not 1 <= self.links <= 4:
             raise ValueError(f"{self.id}: links must be 1 to 4 (or 0 for automatic)")
 
@@ -121,6 +131,7 @@ class RigMonitor:
         self.state = "idle"
         self.state_since = now
         self.task: Optional[str] = None
+        self.planned = False             # the current "busy" is a planned pause (has its own grace)
         self.star_lost_since: Optional[float] = None
         self.settling = False
         self.settling_since: Optional[float] = None
@@ -156,6 +167,22 @@ class RigMonitor:
         self.since = now
         self.restarted = False   # tells the publisher to send history
 
+        # From the ASIAIR app port (app_port), when it's set
+        self.app_link = "down"
+        self.app_link_since = now
+        self.app_bad_lines = 0
+        self.app_firmware: Optional[str] = None
+        self.activity: Optional[str] = None        # what the plan is doing, e.g. "AF: new filter"
+        self.activity_since: Optional[float] = None
+        self.activity_running = False
+        self.plan: Optional[dict] = None
+        self.filter: Optional[str] = None
+        self.exposure_s: Optional[float] = None
+        self.last_af: Optional[dict] = None
+        self.af_runs = 0
+        self._af: dict = {}                        # the autofocus run in progress
+        self.health: list = []                     # e.g. ["under-voltage"] from PiStatus
+
         self.trend = deque([None] * TREND_POINTS, maxlen=TREND_POINTS)
         self._next_bucket = now + TREND_STEP_S
 
@@ -185,6 +212,25 @@ class RigMonitor:
                 self._on_event(event, p, now)
                 self._evaluate(now)
 
+    def set_app_link(self, up: bool, now: float):
+        with self.lock:
+            new = "up" if up else "down"
+            if new != self.app_link:
+                self.app_link, self.app_link_since = new, now
+
+    def feed_app_line(self, text: str, now: float):
+        """One line from the ASIAIR app port (4700). Undocumented, so anything odd is just counted."""
+        with self.lock:
+            try:
+                p = json.loads(text)
+                if isinstance(p, dict) and isinstance(p.get("Event"), str):
+                    self._on_app_event(p["Event"], p, now)
+                    self._evaluate(now)
+                else:
+                    self.app_bad_lines += 1
+            except (ValueError, TypeError, AttributeError, KeyError, IndexError):
+                self.app_bad_lines += 1
+
     def command(self, action: str, now: float) -> bool:
         """ack / disarm / arm from a display. Only changes alerting here; nothing goes to the rig."""
         with self.lock:
@@ -211,6 +257,9 @@ class RigMonitor:
                 ref = self.last_frame_ts if self.last_frame_ts is not None else self.state_since
                 if now - max(ref, self.state_since) > self.s.frame_timeout_s:
                     self._set_state("unknown", now)
+            if self.app_link == "down" and now - self.app_link_since > APP_LINK_STALE_S:
+                self.activity_running = False
+                self.health = []
             while now >= self._next_bucket:
                 total = self._alert_total() if self.state == "guiding" else None
                 self.trend.append(r2(total))
@@ -225,10 +274,11 @@ class RigMonitor:
 
     # ----------------------------------------------------------------- events
 
-    def _set_state(self, state: str, now: float, task: Optional[str] = None):
+    def _set_state(self, state: str, now: float, task: Optional[str] = None, planned: bool = False):
         if state != self.state:
             self.state, self.state_since = state, now
         self.task = task if state == "busy" else None
+        self.planned = planned and state == "busy"
         if state != "guiding":
             self._cand_dir, self._cand_since = 0, None   # pause RMS persistence
 
@@ -243,17 +293,20 @@ class RigMonitor:
         self.acked = False
         self.ended = None
         self.restarted = True
+        if not self.activity_running:
+            self.activity = None     # the pause it explained is over
 
     @property
     def _planned_task(self) -> str:
-        return PLANNED_STOP_TASK[self.s.dialect]
+        """Label for a planned pause: what the app port says the plan is doing, if known."""
+        return self.activity or PLANNED_STOP_TASK[self.s.dialect]
 
     def _planned_stop(self, now: float) -> bool:
         """A clean stop while armed, on a rig whose plan stops guiding on purpose (goto,
         autofocus, flip, target change): a known task with its own grace."""
         if self.s.planned_stop_grace_s is not None and self.armed:
             self.settling = self.dithering = False
-            self._set_state("busy", now, task=self._planned_task)
+            self._set_state("busy", now, task=self._planned_task, planned=True)
             return True
         return False
 
@@ -273,7 +326,7 @@ class RigMonitor:
             self._set_state("guiding", now)
         elif event == "StarLost":
             # "No star selected" (ErrorCode 7) comes with the looping after a stop: not a lost star.
-            if self.task == self._planned_task or p.get("ErrorCode") == 7:
+            if self.planned or p.get("ErrorCode") == 7:
                 return
             if self.state != "star_lost":
                 self.star_lost_since = now
@@ -288,7 +341,7 @@ class RigMonitor:
                 self._set_state("looping", now)
         elif event == "LoopingExposuresStopped":
             if self.s.dialect == "asiair" and self.armed and self.s.planned_stop_grace_s is not None \
-                    and (self.task == self._planned_task or self.state in FRAMES_EXPECTED):
+                    and (self.planned or self.state in FRAMES_EXPECTED):
                 # An ASIAIR plan keeps the guide camera looping through gotos, autofocus and
                 # flips, and only stops it when the plan has finished (seen 13 Nov 2026: guiding
                 # stopped, mount homed, camera stopped). So the night is over: disarm instead of
@@ -299,7 +352,7 @@ class RigMonitor:
                 self.ended = "plan"
                 self.settling = self.dithering = False
                 self._set_state("stopped", now)
-            elif self.task != self._planned_task:
+            elif not self.planned:
                 self._set_state("stopped", now)
         elif event in ("StartCalibration", "Calibrating"):
             self._set_state("busy", now, task="calibration")
@@ -332,11 +385,76 @@ class RigMonitor:
                 self._guiding_started(now)
             if mapped == "star_lost" and self.state != "star_lost":
                 self.star_lost_since = now
-            if mapped in ("stopped", "looping") and self.task == self._planned_task:
+            if mapped in ("stopped", "looping") and self.planned:
                 mapped = None   # still the planned pause
             if mapped:
                 self._set_state(mapped, now, task="calibration" if mapped == "busy" else None)
         # Version, Alert, LockPositionSet, StarSelected, ConfigurationChange... need nothing.
+
+    # ------------------------------------------------------ ASIAIR app port
+
+    def _activity_start(self, label: str, now: float):
+        self.activity, self.activity_since, self.activity_running = label, now, True
+        if self.planned:
+            self.task = label
+
+    def _on_app_event(self, event: str, p: dict, now: float):
+        """ASIAIR app-port events (seen on firmware 14.39). Only what's needed is read; the rest
+        (exposure progress, plate solves, focuser moves, temperatures...) is ignored."""
+        state = p.get("state")
+        if event == "Version":
+            self.app_firmware = p.get("firmware_ver_string") or self.app_firmware
+        elif event == "AutoFocus":
+            if state == "start":
+                why = af_reason(p)
+                self._activity_start({"filter": "AF: new filter", "timer": "AF: timer",
+                                      "temperature": "AF: temp"}.get(why, "Autofocus"), now)
+                if isinstance(p.get("after"), str) and p["after"]:
+                    self.filter = p["after"]
+                self._af = {"why": why, "before": p.get("before"), "after": p.get("after"), "t": now}
+            elif state != "working":
+                point = (p.get("result") or {}).get("last_point")
+                self.af_runs += 1
+                self.last_af = {"ts": round(now), "ok": state == "complete",
+                                "why": self._af.get("why"),
+                                "position": point[0] if isinstance(point, list) and len(point) == 2 else None,
+                                "hfr": r2(point[1]) if isinstance(point, list) and len(point) == 2 else None}
+                self.activity_running = False
+        elif event == "WheelMove":
+            if state == "start":
+                self._activity_start("Filter change", now)
+            elif self.activity == "Filter change":
+                self.activity_running = False
+        elif event == "RestartGuide":
+            if state == "start" and not self.activity:
+                self._activity_start("Restart guiding", now)
+            elif state != "start" and self.activity == "Restart guiding":
+                self.activity_running = False
+        elif event == "Sequence":
+            self.plan = plan_progress(p) or self.plan
+        elif event == "Exposure":
+            if state == "start" and p.get("page") == "plan" and not p.get("tag") \
+                    and isinstance(p.get("exp_us"), (int, float)):
+                self.exposure_s = round(p["exp_us"] / 1e6, 3)
+        elif event == "SaveImage":
+            m = FILTER_IN_NAME.search(str(p.get("filename", "")))
+            if state == "complete" and m:
+                self.filter = m.group(1)
+        elif event == "PiStatus":
+            self.health = [name for key, name in (("is_undervolt", "under-voltage"),
+                                                  ("is_overtemp", "overheating"),
+                                                  ("is_over_current", "over-current")) if p.get(key) is True]
+
+    def _app_payload(self, now: float) -> Optional[dict]:
+        if self.s.app_port is None:
+            return None
+        return {
+            "link": self.app_link, "firmware": self.app_firmware,
+            "activity": self.activity if self.activity_running else None,
+            "activity_since": round(self.activity_since) if self.activity_running and self.activity_since else None,
+            "plan": self.plan, "filter": self.filter, "exposure_s": self.exposure_s,
+            "last_af": self.last_af, "af_runs": self.af_runs, "health": self.health,
+        }
 
     def _on_guide_step(self, p: dict, now: float):
         ra_raw, dec_raw = p.get("RADistanceRaw"), p.get("DECDistanceRaw")
@@ -457,7 +575,12 @@ class RigMonitor:
         if self.state == "star_lost" and self.star_lost_since is not None \
                 and now - self.star_lost_since > s.stopped_grace_s:
             conds.append(("alert", "star_lost"))
-        if self.task == self._planned_task:
+        if self.activity_running and self.activity_since is not None \
+                and now - self.activity_since > s.task_limit_s:
+            conds.append(("alert", "task_too_long"))         # autofocus or filter change stuck
+        if self.health and self.app_link == "up":
+            conds.append(("warn", "asiair_health"))
+        if self.planned:
             if dur > s.planned_stop_grace_s:
                 conds.append(("alert", "stopped"))
         elif self.state == "busy" and dur > s.task_limit_s:
@@ -522,6 +645,7 @@ class RigMonitor:
                 "guiding_since": None if self.guiding_since is None else round(self.guiding_since),
                 "dithers": self.dithers, "settle_fails": self.settle_fails,
                 "ended": self.ended,
+                "app": self._app_payload(now),
             }
 
     def _link_label(self, now: float) -> str:
@@ -532,8 +656,9 @@ class RigMonitor:
         return "up"
 
     def _reason_text(self) -> Optional[str]:
-        if self.reason == "task_too_long" and self.task:
-            return f"{self.task.replace('_', ' ').capitalize()} too long"[:20]
+        task = self.activity if self.activity_running else self.task
+        if self.reason == "task_too_long" and task:
+            return f"{task.replace('_', ' ')[:1].upper()}{task.replace('_', ' ')[1:]} too long"[:20]
         return REASON_TEXT.get(self.reason)
 
     def trend_payload(self, now: float) -> dict:
@@ -555,3 +680,33 @@ class RigMonitor:
         with self.lock:
             out, self.pending_frames = self.pending_frames, []
             return [dict(f, v=1) for f in out]
+
+
+def af_reason(p: dict) -> Optional[str]:
+    """Why an ASIAIR autofocus started: "filter", "timer", "temperature" or None (code 3 and
+    "filter wheel change", code 2 and "time change" seen on firmware 14.39)."""
+    text = str(p.get("comment", "")).lower()
+    if "filter" in text or p.get("code") == 3:
+        return "filter"
+    if "time" in text or p.get("code") == 2:
+        return "timer"
+    if "temp" in text:
+        return "temperature"
+    return None
+
+
+def plan_progress(p: dict) -> Optional[dict]:
+    """Plan progress from an ASIAIR Sequence event, or None if it doesn't look as expected."""
+    prog = p.get("progress")
+    if not isinstance(prog, dict):
+        return None
+    tgt, plan = prog.get("cur_target") or {}, prog.get("cur_plan") or {}
+    where = (p.get("target") or {})
+    out = {
+        "target": tgt.get("target_name") or where.get("current_name"),
+        "target_done": tgt.get("lapse"), "target_total": tgt.get("total"),
+        "done": plan.get("lapse"), "total": plan.get("total"),
+        "target_index": where.get("current_index"), "targets": where.get("total"),
+        "finished": bool(prog.get("plan_end") or where.get("plan_end")),
+    }
+    return out if out["target"] or out["total"] else None

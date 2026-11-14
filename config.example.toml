@@ -69,6 +69,8 @@ dialect = "asiair"
 units = "arcsec"
 planned_stop_grace_s = 600    # the plan pauses guiding for gotos, autofocus and flips: alert if not back in 10 min
 filter_wheel = true           # mono camera: pauses with no slew may be filter changes (night report labels)
+# app_port = 4700             # optional: also listen to the ASIAIR app's port for autofocus, filter changes
+                              #   and plan progress. Unofficial: a future firmware could change it (see docs)
 warn = 0.80
 alert = 1.20
 

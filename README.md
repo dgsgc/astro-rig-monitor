@@ -7,7 +7,7 @@ Keeps an eye on your telescope's autoguiding so you don't have to. It reads the 
 - **Night reports:** each morning, a one-page summary of last night's guiding per rig: RMS through the night, alerts, dithers, and why the plan paused (meridian flip, new target, autofocus, cloud).
 - **Optional MQTT** output for a small desk display (ESP32) or Home Assistant ([message spec](docs/mqtt-spec.md)).
 
-**It is read-only.** It only listens to the guiding events the ASIAIR or PHD2 already broadcast on port 4400. It never sends a command to a rig, so it can't disturb a running session.
+**It is read-only.** It only listens to the guiding events the ASIAIR or PHD2 already broadcast on port 4400. It never sends a command to a rig, so it can't disturb a running session. ASIAIR users can optionally let it listen to the app's own port too, for autofocus, filter changes and plan progress ([details](docs/configuration.md#the-asiair-app-port-optional); unofficial, so a future firmware could change it).
 
 ## What it alerts on
 

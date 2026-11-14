@@ -265,6 +265,7 @@ function stateText(r, e) {
   if (s.state === "busy" && s.task) return s.task;
   let t = STATE_LABEL[s.state] || s.state;
   if (s.state === "guiding" && s.guiding_since) t += " · " + elapsed(nowS() - s.guiding_since);
+  if (s.app && s.app.activity && s.state !== "busy") t += " · " + s.app.activity;
   return t;
 }
 
@@ -343,6 +344,17 @@ function openDetail(id) {
   window.scrollTo(0, 0);
 }
 function stat(k, v, unit = "") { return `<div class="stat"><div class="k">${esc(k)}</div><div class="v num">${v}${unit && v !== "–" ? `<small> ${unit}</small>` : ""}</div></div>`; }
+// From the ASIAIR app port (app_port), when the rig has it set
+function appStats(a) {
+  if (!a) return "";
+  const p = a.plan || {}, af = a.last_af;
+  const sub = p.target_total ? `${p.target_done}/${p.target_total}` + (p.total ? ` <small>plan ${p.done}/${p.total}</small>` : "") : "–";
+  const filt = [a.filter, a.exposure_s ? `${+a.exposure_s.toFixed(1)} s` : null].filter(Boolean).join(" · ") || "–";
+  const focus = af ? (af.ok && af.hfr != null ? `HFR ${fmt(af.hfr)} <small>${elapsed(nowS() - af.ts)} ago</small>` : "failed") : "–";
+  return stat("Target", p.target ? esc(p.target) + (p.targets > 1 ? ` <small>${p.target_index}/${p.targets}</small>` : "") : (a.link === "up" ? "–" : "<small>no app link</small>")) +
+    stat("Sub", sub) + stat("Filter · exposure", esc(filt)) + stat("Last autofocus", focus) +
+    (a.health && a.health.length ? stat("ASIAIR", `<span style="color:var(--amber)">${esc(a.health.join(", "))}</span>`) : "");
+}
 function drawDetail() {
   const r = rigs.get(openRig); if (!r) return;
   const s = r.state || {}, e = effective(r), sc = s.screen, th = s.thresholds || {};
@@ -362,7 +374,8 @@ function drawDetail() {
     stat("Guiding for", s.guiding_since && s.state === "guiding" ? elapsed(nowS() - s.guiding_since) : "–") +
     stat("Dithers", s.dithers ?? "–") +
     stat("Failed settles", s.settle_fails ?? "–") +
-    stat("Alerts", s.armed ? "Armed" : "Off");
+    stat("Alerts", s.armed ? "Armed" : "Off") +
+    appStats(s.app);
   drawGraph(r);
 }
 function drawGraph(r) {

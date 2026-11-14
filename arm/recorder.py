@@ -20,6 +20,9 @@ log = logging.getLogger(__name__)
 SKIP_EVENTS = ('"Event":"Version"', '"Event":"INDIServer"', '"Event": "Version"', '"Event": "INDIServer"')
 
 
+APP_KEEP = ("AutoFocus", "WheelMove", "Sequence", "RestartGuide", "PiStatus")
+
+
 def night_of(t: float) -> str:
     """The night a moment belongs to, named by the evening's date: 02:00 on 13 Nov -> 2026-11-12."""
     return (datetime.fromtimestamp(t) - timedelta(hours=12)).strftime("%Y-%m-%d")
@@ -62,6 +65,17 @@ class NightRecorder:
                     f.write(json.dumps(obj, separators=(",", ":")) + "\n")
                 except OSError as e:
                     log.warning("night recorder: write failed: %s", e)
+
+    def app_line(self, rig: str, text: str, t: float):
+        """An ASIAIR app-port line, kept as {"t", "app"} beside the guiding lines. Only the events
+        the report uses: progress chatter (focus points, exposures, temperatures...) is left out."""
+        if not any(f'"Event":"{e}"' in text.replace(" ", "") for e in APP_KEEP):
+            return
+        if '"AutoFocus"' in text and '"working"' in text:
+            return
+        if '"PiStatus"' in text and "true" not in text:
+            return                       # only a power or heat problem is worth keeping
+        self._write(rig, t, {"t": round(t, 3), "app": text})
 
     def line(self, rig: str, text: str, t: float):
         if any(s in text for s in SKIP_EVENTS):

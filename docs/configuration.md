@@ -21,6 +21,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 |---|---|---|
 | `name` | the id | Shown on the page and in alerts |
 | `host`, `port` | –, 4400 | Where the ASIAIR or PHD2 is |
+| `app_port` | none | ASIAIR only, optional: also listen to the ASIAIR app's own port (4700) for autofocus, filter changes and plan progress. See [The ASIAIR app port](#the-asiair-app-port-optional) |
 | `links` | 0 (auto) | Read-only connections held open at once: 0 picks 2 for an ASIAIR, 1 for PHD2 |
 | `dialect` | "asiair" | "asiair" or "phd2" (PHD2, including PHD2 run by NINA) |
 | `units` | "pixels" | What the rig reports guiding errors in: "arcsec" or "pixels" (see below) |
@@ -32,7 +33,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 | `planned_stop_grace_s` | none | A clean stop by the plan or sequencer (goto, autofocus, flip) shows as "Paused by plan" and alerts only after this long. Suggested: 600 for ASIAIR, 300 for NINA |
 | `offline_grace_s` | 30 | Rig unreachable longer than this while armed → ALERT |
 | `frame_timeout_s` | 30 | Guiding but no guide frames for this long → ALERT. Use 60 for NINA |
-| `task_limit_s` | 600 | A known task (calibration...) running longer than this → ALERT |
+| `task_limit_s` | 600 | A known task (calibration, or with `app_port` an autofocus or filter change) running longer than this → ALERT |
 | `settle_fail_limit` | 3 | Failed settles in a row → ALERT |
 | `settle_max_s` | 180 | Stop treating frames as settling after this long |
 | `lat`, `lon` | none | Site position, degrees (north and east positive). See [End of the night](#end-of-the-night) |
@@ -52,6 +53,30 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 - **Plans:** an ASIAIR plan stops guiding for each goto, autofocus and meridian flip, while the guide camera keeps looping. With `planned_stop_grace_s = 600` these show as "Paused by plan" and only alert if guiding isn't back within 10 minutes.
 - **End of a plan:** the plan stops the guide camera only when it has finished. The rig then disarms itself and shows "Plan finished".
 - **Connections:** an ASIAIR drops each port 4400 connection about 16 s after it opens, and after an ASIAIR restart an old connection can go silently dead. The program reconnects at once and, by default, keeps two connections opened half a cycle apart, so one is always listening and no guide frames are missed (each line is used once). It also re-opens a link that has been silent for 90 s.
+
+### The ASIAIR app port (optional)
+
+Port 4400 tells the monitor how guiding is going, but not *why* a plan paused it. With
+`app_port = 4700` it also listens to the port the ASIAIR app itself uses, which announces what
+the plan is doing. Then:
+
+- pauses get their real name: "AF: new filter", "AF: timer", "AF: temp", "Filter change", instead of "Paused by plan";
+- an autofocus or filter change that hasn't finished after `task_limit_s` alerts as stuck;
+- the web page shows the target, sub *n* of *N*, filter, exposure and the last autofocus result;
+- the ASIAIR's own under-voltage, overheating or over-current warning shows as a WARN;
+- the night report names each pause ("Filter change O→S and autofocus", "Autofocus (timer)"), gives the focus HFR, and counts the subs taken.
+
+It stays read-only: the monitor never sends anything on this port either. The ASIAIR drops a
+connection that sends nothing about every 16 s, so, as on port 4400, two staggered links are
+kept open and nothing is missed.
+
+> **Unofficial, so it could change.** Port 4700 is the ASIAIR app's private interface, not a
+> published one. It was worked out from ASIAIR firmware 14.39 (November 2026). ZWO has kept it
+> stable for years and a change seems unlikely, but a future firmware could rename events,
+> change their fields or close the port. If that happens the monitor carries on as without
+> `app_port`: guiding, levels and alerts all come from port 4400, odd lines on 4700 are
+> counted and ignored, and pauses fall back to "Paused by plan". The firmware it saw is shown
+> as `app.firmware` in the rig's state. Please open an issue if a firmware update breaks it.
 
 ### PHD2 and NINA
 

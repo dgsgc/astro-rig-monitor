@@ -84,6 +84,9 @@ def main(argv=None):
 
     for m in monitors.values():
         RigReader(m, stop, recorder).start()
+        if m.s.app_port:
+            log.info("[%s] also reading the ASIAIR app port %s (unofficial, read-only)", m.s.id, m.s.app_port)
+            RigReader(m, stop, recorder, app=True).start()
 
     sky = {r.id: SkyFetcher(r.id, r.sky_image_url, r.sky_every_s, r.sky_stretch, stop)
            for r in cfg.rigs if r.sky_image_url}

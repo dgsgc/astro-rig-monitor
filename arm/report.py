@@ -22,12 +22,13 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from .config import load
-from .monitor import FRAMES_EXPECTED, RigMonitor, RigSettings
+from .monitor import FRAMES_EXPECTED, RigMonitor, RigSettings, af_reason
 
 MERGE_S = 10          # level changes closer than this are one episode
 SPIKE_ARCSEC = 5.0    # a single frame this far out, and 4x its neighbours, is a jump
 PAUSE_JOIN_S = 240    # plan pauses closer than this are one pause
-SHORT_CAUSE = {"Autofocus, probably": "AF", "Autofocus": "AF", "Autofocus or filter change": "AF/F", "Meridian flip": "Flip", "New target": "Target",
+SHORT_CAUSE = {"Filter change": "F+AF", "Autofocus (timer)": "AF", "Autofocus (temperature)": "AF",
+               "Autofocus, probably": "AF", "Autofocus": "AF", "Autofocus or filter change": "AF/F", "Meridian flip": "Flip", "New target": "Target",
                "Centring on the target": "Centre", "Calibration": "Cal", "Star lost (cloud?)": "Cloud",
                "Paused by NINA": "NINA"}
 REASON = {"rms_high": "RMS above the alert level", "stopped": "guiding stopped", "task_too_long": "pause too long",
@@ -62,7 +63,29 @@ def hour_angle(t: float, ra_hours: float, lon: float) -> float:
     return (lst - ra_hours + 12) % 24 - 12
 
 
-def pause_cause(t1: float, t2: float, mount: list, star_lost: list, s: RigSettings) -> str:
+def short_cause(cause: str) -> str:
+    first = cause.split(" and ")[0]
+    if first.startswith("Filter change"):
+        return SHORT_CAUSE["Filter change"] if "autofocus" in cause else "Filter"
+    return SHORT_CAUSE.get(first, "")
+
+
+def app_cause(t1: float, t2: float, app: list) -> Optional[str]:
+    """What the ASIAIR app port said happened during a pause, or None if it said nothing."""
+    inside = [(t, e) for t, e in app if t1 - 90 <= t <= t2 + 5]    # a filter change comes just before
+    afs = [e for _, e in inside if e.get("Event") == "AutoFocus" and e.get("state") == "start"]
+    wheel = any(e.get("Event") == "WheelMove" for _, e in inside)
+    if not afs and not wheel:
+        return None
+    first = afs[0] if afs else {}
+    why = af_reason(first) if afs else None
+    if wheel or why == "filter":
+        names = f" {first['before']}→{first['after']}" if first.get("before") and first.get("after") else ""
+        return f"Filter change{names}" + (" and autofocus" if afs else "")
+    return {"timer": "Autofocus (timer)", "temperature": "Autofocus (temperature)"}.get(why, "Autofocus")
+
+
+def pause_cause(t1: float, t2: float, mount: list, star_lost: list, s: RigSettings, app: Optional[list] = None) -> str:
     """Best guess at why the plan paused guiding. Port 4400 reports slews (ScopeGoto/ScopeHome)
     and calibration, but not autofocus or filter changes, so a pause with no slew is autofocus, or
     autofocus or a filter change on a rig with a filter wheel (filter_wheel). Worked out from real ASIAIR nights."""
@@ -86,9 +109,15 @@ def pause_cause(t1: float, t2: float, mount: list, star_lost: list, s: RigSettin
             cause = "Centring on the target"
         if calibrated:
             cause += " and recalibration"
+        known = app_cause(t1, t2, app or [])
+        if known:
+            cause += " and " + known[:1].lower() + known[1:]
         return cause
     if calibrated:
         return "Calibration"
+    known = app_cause(t1, t2, app or [])
+    if known:
+        return known
     if lost >= 3:
         return "Star lost (cloud?)"
     if s.filter_wheel is False:
@@ -107,29 +136,50 @@ def analyse(settings: RigSettings, path: str) -> dict:
             except ValueError:
                 continue
             if "raw" in rec and "t" in rec:
-                raws.append((rec["t"], rec["raw"]))
-    if not raws:
+                raws.append((rec["t"], rec["raw"], False))
+            elif "app" in rec and "t" in rec:
+                raws.append((rec["t"], rec["app"], True))
+    if not any(not is_app for _, _, is_app in raws):
         raise ValueError(f"{path}: no guiding events")
 
     t0 = raws[0][0]
     m = RigMonitor(settings, t0)
     m.set_link(True, t0)          # the live bridge reconnects quietly; don't show the logger's gaps
     frames, timeline, star_lost, dithers, mount = [], [], [], [], []
+    app, autofocus, subs = [], [], 0      # from the ASIAIR app port, if it was recorded
     last = None
     next_tick = t0 + 1
 
     def note(t):
         nonlocal last
-        cur = (m.state, m.task, m.level, m.reason, m.armed, m.ended)
+        cur = (m.state, m.task, m.level, m.reason, m.armed, m.ended, m.planned)
         if cur != last:
             timeline.append((t,) + cur)
             last = cur
 
-    for t, raw in raws:
+    for t, raw, is_app in raws:
         while next_tick <= t:
             m.tick(next_tick)
             note(next_tick)
             next_tick += 1
+        if is_app:
+            m.set_app_link(True, t)
+            n_af = m.af_runs
+            m.feed_app_line(raw, t)
+            try:
+                ev = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(ev, dict):
+                continue
+            if ev.get("Event") in ("AutoFocus", "WheelMove"):
+                app.append((t, ev))
+            if ev.get("Event") == "Sequence" and ev.get("state") == "frame_complete":
+                subs += 1
+            if m.af_runs > n_af and m.last_af:
+                autofocus.append((t, dict(m.last_af)))
+            note(t)
+            continue
         n_dith = m.dithers
         m.feed_line(raw, t)
         if m.dithers > n_dith:
@@ -193,12 +243,12 @@ def analyse(settings: RigSettings, path: str) -> dict:
     alerts = episodes(lambda r: r[3] == "alert")
     warns = episodes(lambda r: r[3] == "warn")
     pauses = []
-    for p in episodes(lambda r: r[1] == "busy" and r[2] and r[2].startswith("Paused")):
+    for p in episodes(lambda r: r[1] == "busy" and r[7]):
         if pauses and p[0] - pauses[-1][1] < PAUSE_JOIN_S:     # stop, restart, stop again: one pause
             pauses[-1][1] = p[1]
         else:
             pauses.append(p)
-    pauses = [(p[0], p[1], pause_cause(p[0], p[1], mount, star_lost, settings)) for p in pauses if p[1] - p[0] >= 30]
+    pauses = [(p[0], p[1], pause_cause(p[0], p[1], mount, star_lost, settings, app)) for p in pauses if p[1] - p[0] >= 30]
     guiding_s = sum(
         (timeline[i + 1][0] if i + 1 < len(timeline) else t_end) - row[0]
         for i, row in enumerate(timeline) if row[1] in FRAMES_EXPECTED)
@@ -218,7 +268,8 @@ def analyse(settings: RigSettings, path: str) -> dict:
     return {
         "s": settings, "frames": frames, "per_min": per_min, "timeline": timeline, "t_start": t0, "t_end": t_end,
         "alerts": alerts, "warns": warns, "pauses": pauses, "spikes": spikes, "star_lost": star_lost,
-        "dithers": dithers, "settle_fails": m.settle_fails, "guiding_s": guiding_s, "ended": ended,
+        "dithers": dithers, "settle_fails": m.settle_fails, "autofocus": autofocus, "subs": subs,
+        "plan": m.plan, "app": bool(app) or subs > 0, "guiding_s": guiding_s, "ended": ended,
         "hours": hours, "median": st.median(totals) if totals else None,
         "p90": sorted(totals)[int(len(totals) * 0.9)] if totals else None,
         "first_frame": frames[0][0] if frames else t0, "last_frame": frames[-1][0] if frames else t_end,
@@ -267,7 +318,7 @@ def timeline_svg(a, T0, T1):
     last_tag = -1e9
     for t1, t2, cause in a["pauses"]:
         o.append(f'<rect x="{x(t1):.1f}" y="8" width="{max(x(t2) - x(t1), 1.5):.1f}" height="{CH - 16}" class="pause"/>')
-        tag = SHORT_CAUSE.get(cause.split(" and ")[0], "")
+        tag = short_cause(cause)
         mid = (x(t1) + x(t2)) / 2
         if tag and mid - last_tag > 34:       # don't let neighbouring labels run together
             last_tag = mid
@@ -366,6 +417,12 @@ def rig_section(a, T0, T1):
         ("Alert time", dur(alert_min * 60) if alert_min else "none",
          f"warn {dur(warn_min * 60)}" if warn_min else "no warnings"),
     ]
+    if a.get("app"):
+        hfrs = [af["hfr"] for _, af in a["autofocus"] if af.get("ok") and af.get("hfr") is not None]
+        focus = f"{len(a['autofocus'])} autofocus run{'s' if len(a['autofocus']) != 1 else ''}"
+        if hfrs:
+            focus += f", HFR {min(hfrs):.2f}–{max(hfrs):.2f}" if len(hfrs) > 1 else f", HFR {hfrs[0]:.2f}"
+        tiles.append(("Subs taken", f"{a['subs']}", focus))
     tiles_html = "".join(
         f'<div class="tile"><div class="k">{k}</div><div class="v">{v}</div><div class="n">{n}</div></div>'
         for k, v, n in tiles)
@@ -373,7 +430,13 @@ def rig_section(a, T0, T1):
     # events, in time order
     ev = []
     for t1, t2, cause in a["pauses"]:
-        ev.append((t1, "pause", f"{cause}: guiding paused {dur(t2 - t1)}"))
+        focus = [af for t, af in a.get("autofocus", []) if t1 - 5 <= t <= t2 + 60]
+        extra = ""
+        if focus:
+            af = focus[-1]
+            extra = f", focused at HFR {af['hfr']:.2f}" if af.get("ok") and af.get("hfr") is not None \
+                else ", autofocus failed" if not af.get("ok") else ""
+        ev.append((t1, "pause", f"{cause}: guiding paused {dur(t2 - t1)}{extra}"))
     for t1, t2, why in a["alerts"]:
         reasons = ", ".join(sorted(REASON.get(w, w.replace("_", " ")) for w in why if w)) or "alert"
         ev.append((t1, "alert", f"ALERT for {dur(t2 - t1)}: {reasons}"))
@@ -432,7 +495,7 @@ def rig_section(a, T0, T1):
     <div class="scroll">{timeline_svg(a, T0, T1)}</div>
     <div class="legend">
       <span><i class="lg-line"></i>total RMS</span>
-      <span><i class="lg-pause"></i>paused by plan (AF autofocus, AF/F autofocus or filter change, Flip, Target, Centre, Cloud)</span>
+      <span><i class="lg-pause"></i>paused by plan (AF autofocus, F+AF filter change and autofocus, AF/F autofocus or filter change, Flip, Target, Centre, Cloud)</span>
       <span><i class="lg s-ok"></i>OK</span><span><i class="lg s-warn"></i>warn</span>
       <span><i class="lg s-alert"></i>alert</span><span><i class="lg s-idle"></i>not watching</span>
       <span><i class="lg-dither"></i>dither</span><span><i class="lg-lost"></i>star lost</span>

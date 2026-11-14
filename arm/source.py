@@ -13,6 +13,11 @@ guiding or not. A drop after a connection that lasted LONG_LIVED_S is that routi
 reconnect at once, quietly. To miss nothing during the reconnect, an ASIAIR rig gets
 two links (`links` setting) opened half a cycle apart, so one is always listening. Both
 hear the same lines, and each line (it carries the rig's own timestamp) is used once.
+
+With app=True the same reader listens to an ASIAIR's app port (app_port, normally 4700)
+instead, feeding feed_app_line(). That port is the ASIAIR app's own, unofficial and
+undocumented interface: it is only ever read, and a future firmware could change it. Losing
+it never makes the rig look offline; guiding alerts still come from port 4400.
 """
 
 import logging
@@ -51,11 +56,13 @@ DEDUP_S = 60        # how long a line is remembered for spotting its copy on ano
 class RigReader(threading.Thread):
     """Runs `links` staggered connections to one rig and feeds each line to the monitor once."""
 
-    def __init__(self, monitor: RigMonitor, stop: threading.Event, recorder=None):
-        super().__init__(name=f"rig-{monitor.s.id}", daemon=True)
+    def __init__(self, monitor: RigMonitor, stop: threading.Event, recorder=None, app: bool = False):
+        super().__init__(name=f"rig-{monitor.s.id}{'-app' if app else ''}", daemon=True)
         self.m = monitor
         self.stop = stop
         self.rec = recorder            # NightRecorder or None
+        self.app = app
+        self.port = monitor.s.app_port if app else monitor.s.port
         self.n = max(1, getattr(monitor.s, "links", 1))
         self._lock = threading.Lock()
         self._up = 0                   # links currently connected
@@ -76,16 +83,16 @@ class RigReader(threading.Thread):
         s = self.m.s
         if i and self.stop.wait(i * CYCLE_S / self.n):     # stagger across the reset cycle
             return
-        tag = f"[{s.id}]" if self.n == 1 else f"[{s.id}#{i + 1}]"
+        tag = f"[{s.id}{' app' if self.app else ''}{'' if self.n == 1 else f'#{i + 1}'}]"
         delay = 5
         quiet = False       # last connection only went silent or was routinely reset
         while not self.stop.is_set():
             opened = None
             try:
-                with socket.create_connection((s.host, s.port), timeout=10) as sock:
+                with socket.create_connection((s.host, self.port), timeout=10) as sock:
                     sock.settimeout(2)
                     _keepalive(sock)
-                    (log.debug if quiet else log.info)("%s connected to %s:%s", tag, s.host, s.port)
+                    (log.debug if quiet else log.info)("%s connected to %s:%s", tag, s.host, self.port)
                     opened = time.time()
                     with self._lock:
                         self._opened[i] = opened
@@ -108,11 +115,11 @@ class RigReader(threading.Thread):
                     if self.stop.wait(self._spacing_wait(i)):
                         break
                     continue                                   # routine reset: straight back
-                log.warning("%s %s:%s %s", tag, s.host, s.port, e)
+                log.warning("%s %s:%s %s", tag, s.host, self.port, e)
                 quiet = False
             with self._lock:
                 if self._up == 0:
-                    self.m.set_link(False, time.time())
+                    self._set_link(False, time.time())
             if self.stop.wait(delay):
                 break
             delay = min(delay * 2, 60)
@@ -137,10 +144,13 @@ class RigReader(threading.Thread):
             self._up += d
             if was == 0 and self._up == 1:
                 now = time.time()
-                self.m.set_link(True, now)
-                if self.rec:
+                self._set_link(True, now)
+                if self.rec and not self.app:
                     self.rec.connected(self.m.s.id, now)
             # Going down is left to _link: a routine reset reconnects at once and isn't an outage.
+
+    def _set_link(self, up: bool, now: float):
+        (self.m.set_app_link if self.app else self.m.set_link)(up, now)
 
     def _line(self, text: str):
         now = time.time()
@@ -151,6 +161,14 @@ class RigReader(threading.Thread):
                 self._seen[text] = now
                 if len(self._seen) > 4000:
                     self._seen = {k: v for k, v in self._seen.items() if now - v < DEDUP_S}
+        if self.app:
+            seen = self.m.app_firmware
+            self.m.feed_app_line(text, now)
+            if self.m.app_firmware != seen:
+                log.info("[%s] ASIAIR app port: firmware %s", self.m.s.id, self.m.app_firmware)
+            if self.rec:
+                self.rec.app_line(self.m.s.id, text, now)
+            return
         self.m.feed_line(text, now)
         if self.rec:
             self.rec.line(self.m.s.id, text, now)

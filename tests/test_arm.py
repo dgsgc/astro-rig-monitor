@@ -392,6 +392,149 @@ class JoinedMidDither(unittest.TestCase):
         self.assertEqual(len(m.alert_frames), n_alert + 1)
 
 
+class AppPort(unittest.TestCase):
+    """The ASIAIR app port (4700): events as seen on firmware 14.39, 13 Nov 2026."""
+
+    def app(self, m, t, event, **fields):
+        m.feed_app_line(json.dumps({"Event": event, "Timestamp": "1.0", **fields}), t)
+
+    def paused_for(self, m, s, seconds):
+        s._emit("GuidingStopped")
+        for k in range(int(seconds / 1.5)):
+            s.t += 1.5
+            s._emit("LoopingExposures", Frame=k)
+        run(m, s)
+
+    def test_filter_change_and_autofocus_are_named(self):
+        m, s = new(rig(planned_stop_grace_s=600, app_port=4700))
+        m.set_app_link(True, s.t)
+        run(m, s.guide(60, 0.5))
+        self.app(m, s.t, "WheelMove", state="start")
+        self.assertEqual(m.state, "guiding")                       # guiding carries on during the move
+        self.assertEqual(m.state_payload(s.t)["app"]["activity"], "Filter change")
+        self.app(m, s.t + 6, "WheelMove", state="complete", position=4)
+        self.app(m, s.t + 30, "AutoFocus", state="start", comment="filter wheel change", code=3, before="O", after="S")
+        self.paused_for(m, s, 120)
+        self.assertEqual((m.state, m.task, m.level), ("busy", "AF: new filter", "ok"))
+        self.assertEqual(m.filter, "S")
+        self.app(m, s.t, "AutoFocus", state="complete", result={"last_point": [44833, 2.150666]})
+        self.app(m, s.t, "RestartGuide", state="start")
+        self.assertEqual(m.task, "AF: new filter")                 # still the reason for the pause
+        run(m, s.start().guide(60, 0.5))
+        self.assertEqual((m.state, m.level), ("guiding", "ok"))
+        a = m.state_payload(s.t)["app"]
+        self.assertIsNone(a["activity"])
+        self.assertEqual((a["last_af"]["hfr"], a["last_af"]["why"], a["af_runs"]), (2.15, "filter", 1))
+
+    def test_timer_autofocus_label(self):
+        m, s = new(rig(planned_stop_grace_s=600, app_port=4700))
+        run(m, s.guide(60, 0.5))
+        self.app(m, s.t, "AutoFocus", state="start", comment="time change", code=2, hours=1.03)
+        self.paused_for(m, s, 60)
+        self.assertEqual(m.task, "AF: timer")
+
+    def test_without_app_port_label_is_generic(self):
+        m, s = new(rig(planned_stop_grace_s=600))
+        run(m, s.guide(60, 0.5))
+        self.paused_for(m, s, 60)
+        self.assertEqual(m.task, "Paused by plan")
+        self.assertIsNone(m.state_payload(s.t)["app"])
+
+    def test_stuck_autofocus_alerts(self):
+        m, s = new(rig(planned_stop_grace_s=3600, task_limit_s=300, app_port=4700))
+        m.set_app_link(True, s.t)
+        run(m, s.guide(60, 0.5))
+        self.app(m, s.t, "AutoFocus", state="start", comment="time change", code=2)
+        self.paused_for(m, s, 320)
+        self.assertEqual((m.level, m.reason), ("alert", "task_too_long"))
+        self.assertEqual(m.state_payload(s.t)["reason_text"], "AF: timer too long")
+
+    def test_asiair_health_warns(self):
+        m, s = new(rig(app_port=4700))
+        m.set_app_link(True, s.t)
+        run(m, s.guide(60, 0.5))
+        self.app(m, s.t, "PiStatus", is_overtemp=False, temp=40.0, is_undervolt=True, is_over_current=False)
+        m.tick(s.t + 1)
+        self.assertEqual((m.level, m.reason), ("warn", "asiair_health"))
+        self.app(m, s.t + 2, "PiStatus", is_overtemp=False, temp=40.0, is_undervolt=False, is_over_current=False)
+        m.tick(s.t + 3)
+        self.assertEqual(m.level, "ok")
+
+    def test_plan_progress_filter_and_exposure(self):
+        m, s = new(rig(app_port=4700))
+        self.app(m, s.t, "Sequence", state="frame_complete", progress={
+            "targets": {"total": 2, "lapse": 0}, "cur_plan": {"total": 130, "lapse": 39},
+            "cur_target": {"total": 60, "lapse": 39, "target_name": "IC 5070", "id": 4}, "plan_end": False},
+            target={"current_name": "IC 5070", "current_index": 1, "total": 2, "plan_end": False})
+        self.app(m, s.t, "Exposure", page="plan", state="start", exp_us=300000000, gain=100)
+        self.app(m, s.t, "Exposure", page="plan", tag="AutoFocus", state="start", exp_us=2000000, gain=100)
+        self.app(m, s.t, "SaveImage", state="complete",
+                 filename="Light_IC 5070_300.0s_Bin1_533MM_O_gain100_20261113-213030_93deg_-3.5C_0019.fit")
+        a = m.state_payload(s.t)["app"]
+        self.assertEqual((a["plan"]["target"], a["plan"]["target_done"], a["plan"]["total"]), ("IC 5070", 39, 130))
+        self.assertEqual((a["filter"], a["exposure_s"]), ("O", 300.0))
+
+    def test_odd_lines_are_counted_not_fatal(self):
+        m, s = new(rig(app_port=4700))
+        for text in ("not json", "[1, 2]", '{"Event": 5}', '{"Event": "Sequence", "progress": "?"}',
+                     '{"Event": "AutoFocus", "state": "complete", "result": {"last_point": "x"}}',
+                     '{"Event": "SomethingNew", "state": "start"}'):
+            m.feed_app_line(text, s.t)
+        self.assertEqual(m.app_bad_lines, 3)
+        self.assertIsNone(m.last_af["hfr"])
+
+    def test_app_port_is_asiair_only(self):
+        with self.assertRaises(ValueError):
+            rig(dialect="phd2", app_port=4700)
+
+    def test_recorder_keeps_only_what_the_report_uses(self):
+        from arm.recorder import NightRecorder
+        with tempfile.TemporaryDirectory() as d:
+            rec = NightRecorder(d)
+            for ev in ({"Event": "AutoFocus", "state": "start", "code": 2},
+                       {"Event": "AutoFocus", "state": "working", "result": {}},
+                       {"Event": "FocuserMove", "position": 1}, {"Event": "Temperature", "value": 1},
+                       {"Event": "PiStatus", "is_undervolt": False}, {"Event": "PiStatus", "is_undervolt": True},
+                       {"Event": "WheelMove", "state": "start"}):
+                rec.app_line("r", json.dumps(ev), T0)
+            rec.close()
+            (night,) = os.listdir(d)
+            with open(os.path.join(d, night, "r.jsonl")) as f:
+                lines = [json.loads(json.loads(x)["app"]) for x in f]
+        self.assertEqual([(e["Event"], e.get("state")) for e in lines],
+                         [("AutoFocus", "start"), ("PiStatus", None), ("WheelMove", "start")])
+
+    def test_report_names_the_pause(self):
+        from arm import report
+        from arm.recorder import NightRecorder
+        st = rig(planned_stop_grace_s=600, app_port=4700, filter_wheel=True)
+        m, s = new(st)
+        s.guide(120, 0.5)
+        s._emit("GuidingStopped")
+        stop_t = s.t
+        for k in range(100):
+            s.t += 1.5
+            s._emit("LoopingExposures", Frame=k)
+        s.start().guide(120, 0.5)
+        with tempfile.TemporaryDirectory() as d:
+            rec = NightRecorder(d)
+            app = [(stop_t - 40, {"Event": "WheelMove", "state": "start"}),
+                   (stop_t - 34, {"Event": "WheelMove", "state": "complete", "position": 4}),
+                   (stop_t + 1, {"Event": "AutoFocus", "state": "start", "comment": "filter wheel change",
+                                 "code": 3, "before": "O", "after": "S"}),
+                   (stop_t + 140, {"Event": "AutoFocus", "state": "complete", "result": {"last_point": [44833, 2.15]}})]
+            rows = [(t, False, line) for t, line in s.lines] + [(t, True, json.dumps(e)) for t, e in app]
+            for t, is_app, line in sorted(rows, key=lambda r: r[0]):
+                (rec.app_line if is_app else rec.line)("r", line, t)
+            rec.close()
+            path = [os.path.join(d, n, "r.jsonl") for n in os.listdir(d)][0]
+            a = report.analyse(st, path)
+            html, _ = report.build([(st, path)])
+        self.assertEqual([p[2] for p in a["pauses"]], ["Filter change O→S and autofocus"])
+        self.assertIn("focused at HFR 2.15", html)
+        self.assertIn("Subs taken", html)
+
+
 class Dawn(unittest.TestCase):
     def test_sun_altitude(self):
         import calendar

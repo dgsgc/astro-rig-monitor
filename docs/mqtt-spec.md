@@ -67,7 +67,8 @@ The main message, enough to draw a rig's row on the overview and the text on the
   "last_frame_ts": 1794340918,
   "guiding_since": 1794336600,
   "dithers": 14, "settle_fails": 0,
-  "ended": null
+  "ended": null,
+  "app": null
 }
 ```
 
@@ -77,7 +78,7 @@ The main message, enough to draw a rig's row on the overview and the text on the
 | `state` | What the rig is doing: `guiding`, `dithering`, `settling`, `star_lost`, `stopped`, `looping`, `calibrating`, `busy` (a known task, see `task`), `idle`, `unknown` |
 | `task` | When known: `calibration`, `Paused by NINA` or `Paused by plan` (a PHD2 or ASIAIR rig with `planned_stop_grace_s`: NINA or the ASIAIR plan stopped guiding for a goto, target change, autofocus or flip); otherwise `null`. Depends on what the rig reports (to be confirmed from the logs) |
 | `level` | `ok`, `warn`, `alert`, or `idle` (grey: not imaging, or disarmed) |
-| `reason` | Code for warn/alert: `rms_high`, `star_lost`, `stopped`, `settle_failed`, `task_too_long`, `rig_offline`, `data_stale` |
+| `reason` | Code for warn/alert: `rms_high`, `star_lost`, `stopped`, `settle_failed`, `task_too_long`, `rig_offline`, `data_stale`, `asiair_health` (only with `app_port`: the ASIAIR reports under-voltage, overheating or over-current) |
 | `reason_text` | Short label for the screen (≤ 20 characters), e.g. `"Star lost"`. The display adds the elapsed time from `since`, so it can count up between messages |
 | `since` | When the current `level` + `reason` began |
 | `armed` / `acked` | See *Arming and acknowledging* below |
@@ -86,6 +87,7 @@ The main message, enough to draw a rig's row on the overview and the text on the
 | `last_good_total` | Last `alert_total` before the data stopped, for "Last good 0.71″" |
 | `thresholds` | This rig's bands, so the display can draw the dashed lines |
 | `snr_trend` | `rising`, `steady` or `falling` over the last few minutes |
+| `app` | `null` unless the rig has `app_port` set. Otherwise what the ASIAIR app port said: `link` (`"up"`/`"down"`), `firmware` (e.g. `"14.39"`), `activity` (what the plan is doing right now, e.g. `"AF: new filter"`, `"Filter change"`, or `null`), `activity_since`, `plan` (`target`, `target_done`, `target_total`, `done`, `total`, `target_index`, `targets`, `finished`, or `null`), `filter`, `exposure_s`, `last_af` (`ts`, `ok`, `why`: `"filter"`/`"timer"`/`"temperature"`/`null`, `position`, `hfr`), `af_runs`, `health` (list, e.g. `["under-voltage"]`). The port is unofficial: any field may be `null` if a firmware stops sending it. While a planned pause is explained by it, `task` carries the same label as `activity` |
 | `ended` | Why the bridge disarmed the rig itself: `"dawn"` (the sun is rising past `dawn_sun_alt` and guiding has stopped) or `"plan"` (an ASIAIR plan finished: its guide camera stopped looping after a planned stop). `null` otherwise, and cleared when guiding starts again |
 
 ### `arm/rig/<rig>/trend`
