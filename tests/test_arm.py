@@ -1098,7 +1098,9 @@ class Setup(unittest.TestCase):
         try:
             r = source.RigReader(m, stop)
             r.start()
-            time.sleep(4)
+            deadline = time.time() + 30          # slow CI runners: wait for lines, not a fixed time
+            while len(m.lines) < 150 and time.time() < deadline:
+                time.sleep(0.1)
             stop.set()
             done.set()
             r.join(5)
