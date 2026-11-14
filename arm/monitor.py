@@ -54,6 +54,7 @@ class RigSettings:
     name: str = ""
     host: str = ""
     port: int = 4400
+    links: int = 0                   # parallel read-only connections; 0 = auto (2 for ASIAIR, 1 for PHD2)
     dialect: str = "asiair"          # "asiair" (IsDither/IsSettle flags) or "phd2" (events only)
     units: str = "pixels"            # what RADistanceRaw/DECDistanceRaw are in: "pixels" or "arcsec"
     guide_scale: float = 1.0         # arcsec per guide pixel, binning included
@@ -97,6 +98,10 @@ class RigSettings:
             raise ValueError(f"{self.id}: dialect must be 'asiair' or 'phd2'")
         if not self.warn < self.alert:
             raise ValueError(f"{self.id}: warn must be below alert")
+        if self.links == 0:
+            self.links = 2 if self.dialect == "asiair" else 1
+        if not 1 <= self.links <= 4:
+            raise ValueError(f"{self.id}: links must be 1 to 4 (or 0 for automatic)")
 
     @property
     def to_arcsec(self) -> float:

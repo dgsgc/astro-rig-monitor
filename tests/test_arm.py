@@ -1034,6 +1034,94 @@ class Setup(unittest.TestCase):
         self.assertGreaterEqual(f["frames"], 12)
         self.assertEqual(received, [b""])
 
+    def test_reader_two_links_no_dupes_no_sends(self):
+        """Two staggered links to a server that resets each connection: every line once, nothing sent."""
+        import socket
+        import threading
+        import time
+        from arm import source
+        old = source.CYCLE_S, source.LONG_LIVED_S
+        source.CYCLE_S, source.LONG_LIVED_S = 1.0, 0.2
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(4)
+        srv.settimeout(0.2)
+        clients, sent_to_us, lock, done = [], [], threading.Lock(), threading.Event()
+
+        def accept():
+            while not done.is_set():
+                try:
+                    c, _ = srv.accept()
+                except socket.timeout:
+                    continue
+                c.setblocking(False)
+                with lock:
+                    clients.append((c, time.time()))
+
+        def broadcast():
+            k = 0
+            while not done.is_set():
+                k += 1
+                line = json.dumps({"Event": "Tick", "Timestamp": k}).encode() + b"\r\n"
+                with lock:
+                    for c, opened in list(clients):
+                        try:
+                            sent_to_us.append(c.recv(100))   # anything the reader sent us
+                        except (BlockingIOError, OSError):
+                            pass
+                        if time.time() - opened > 0.6:     # routine reset, like an ASIAIR
+                            c.close()
+                            clients.remove((c, opened))
+                            continue
+                        try:
+                            c.sendall(line)
+                        except OSError:
+                            pass
+                time.sleep(0.02)
+
+        class FakeMonitor:
+            def __init__(self, port):
+                self.s = RigSettings(id="fake", host="127.0.0.1", port=port, links=2)
+                self.lines, self.links = [], []
+
+            def feed_line(self, text, now):
+                self.lines.append(json.loads(text)["Timestamp"])
+
+            def set_link(self, up, now):
+                self.links.append(up)
+
+        m = FakeMonitor(srv.getsockname()[1])
+        stop = threading.Event()
+        threads = [threading.Thread(target=accept, daemon=True), threading.Thread(target=broadcast, daemon=True)]
+        for t in threads:
+            t.start()
+        try:
+            r = source.RigReader(m, stop)
+            r.start()
+            time.sleep(4)
+            stop.set()
+            done.set()
+            r.join(5)
+            for t in threads:
+                t.join(2)
+        finally:
+            source.CYCLE_S, source.LONG_LIVED_S = old
+            srv.close()
+        got = m.lines
+        self.assertGreater(len(got), 100)
+        self.assertEqual(len(got), len(set(got)), "a line was fed twice")
+        self.assertEqual(got, sorted(got))
+        self.assertLessEqual(got[-1] - got[0] + 1 - len(got), 2, "lines were missed")
+        self.assertEqual([x for x in sent_to_us if x], [])
+        self.assertEqual(m.links[:1], [True])
+
+    def test_links_default_by_dialect(self):
+        self.assertEqual(rig().links, 2)
+        self.assertEqual(rig(dialect="phd2").links, 1)
+        self.assertEqual(rig(dialect="phd2", links=2).links, 2)
+        with self.assertRaises(ValueError):
+            rig(links=9)
+
     def test_setup_writes_a_config_that_loads(self):
         from arm import setup
         answers = iter([

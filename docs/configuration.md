@@ -21,6 +21,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 |---|---|---|
 | `name` | the id | Shown on the page and in alerts |
 | `host`, `port` | –, 4400 | Where the ASIAIR or PHD2 is |
+| `links` | 0 (auto) | Read-only connections held open at once: 0 picks 2 for an ASIAIR, 1 for PHD2 |
 | `dialect` | "asiair" | "asiair" or "phd2" (PHD2, including PHD2 run by NINA) |
 | `units` | "pixels" | What the rig reports guiding errors in: "arcsec" or "pixels" (see below) |
 | `guide_scale` | 1.0 | Arcsec per guide-camera pixel, binning included. Only used with `units = "pixels"`. Or give `guide_pixel_um`, `guide_focal_mm` and `guide_binning` and it's worked out |
@@ -50,7 +51,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 - **Telling ASIAIRs apart:** every ASIAIR calls itself "ASI AIR guider", so each rig is known by its address. Give each one a DHCP reservation on your router.
 - **Plans:** an ASIAIR plan stops guiding for each goto, autofocus and meridian flip, while the guide camera keeps looping. With `planned_stop_grace_s = 600` these show as "Paused by plan" and only alert if guiding isn't back within 10 minutes.
 - **End of a plan:** the plan stops the guide camera only when it has finished. The rig then disarms itself and shows "Plan finished".
-- **Connections:** an ASIAIR drops each port 4400 connection about 20 s after it opens, and after an ASIAIR restart an old connection can go silently dead. The program reconnects within a second, and re-opens a link that has been silent for 90 s.
+- **Connections:** an ASIAIR drops each port 4400 connection about 16 s after it opens, and after an ASIAIR restart an old connection can go silently dead. The program reconnects at once and, by default, keeps two connections opened half a cycle apart, so one is always listening and no guide frames are missed (each line is used once). It also re-opens a link that has been silent for 90 s.
 
 ### PHD2 and NINA
 
