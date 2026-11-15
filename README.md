@@ -9,6 +9,37 @@ Keeps an eye on your telescope's autoguiding so you don't have to. It reads the 
 
 **It is read-only.** It only listens to the guiding events the ASIAIR or PHD2 already broadcast on port 4400. It never sends a command to a rig, so it can't disturb a running session. ASIAIR users can optionally let it listen to the app's own port too, for autofocus, filter changes and plan progress ([details](docs/configuration.md#the-asiair-app-port-optional); unofficial, so a future firmware could change it).
 
+## Screenshots
+
+These are from a demo night with three rigs: one guiding well (green), one with RMS creeping up (amber, WARNING) and one that has lost its guide star (red, ALERT).
+
+**Desktop.** Every rig at a glance, with total RMS, RA/Dec and a 10-minute trend against the warn and alert levels:
+
+![Overview on a desktop](docs/screenshots/desktop-overview.png)
+
+The detail page has the last 100 frames (dithers shaded), the stats, and the all-sky camera if you have one. ASIAIR rigs that use the optional app port also show the target, sub count, filter and last autofocus:
+
+![Rig detail on a desktop](docs/screenshots/desktop-102ed-detail.png)
+
+**Phone.** The overview, a rig in ALERT, and a rig in WARNING:
+
+<p>
+<img src="docs/screenshots/phone-overview.png" width="30%" alt="Overview on a phone">
+<img src="docs/screenshots/phone-kkro-alert.png" width="30%" alt="A rig in ALERT on a phone">
+<img src="docs/screenshots/phone-sqa55-detail.png" width="30%" alt="A rig in WARNING on a phone">
+</p>
+
+**Desk display (optional, over MQTT).** These show an ESP32 touch-screen display. Its firmware isn't part of this repository; the [message spec](docs/mqtt-spec.md) is what it reads. The images are mock-ups built from the display's own layout:
+- The overview, with one row per rig. Its LED is off when everything's fine, solid on a warning and flashing on an alert.
+- A rig's guide graph.
+- The sky camera, which the display shows first when cloud could be the cause.
+
+<p>
+<img src="docs/screenshots/esp32-overview.png" width="32%" alt="Desk display overview">
+<img src="docs/screenshots/esp32-sqa55-graph.png" width="32%" alt="Desk display guide graph">
+<img src="docs/screenshots/esp32-kkro-sky.png" width="32%" alt="Desk display sky camera">
+</p>
+
 ## What it alerts on
 
 Each rig is **idle** until guiding starts, then **armed**:
