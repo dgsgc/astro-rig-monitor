@@ -25,6 +25,7 @@ How the Astro Rig Monitor and displays (an ESP32 screen, Home Assistant, anythin
 | `arm/rig/<rig>/history` | bridge | yes | every 60 s, and when guiding (re)starts |
 | `arm/rig/<rig>/frame` | bridge | no | every guide frame |
 | `arm/rig/<rig>/sky` | bridge | yes | binary JPEG, when the all-sky image changes (rigs with `sky_image_url`) |
+| `arm/rig/<rig>/sky_full` | bridge | yes | the same image sized for the display's whole screen |
 | `arm/rig/<rig>/sky_info` | bridge | yes | after each sky fetch (every 2 min, and at once when the rig goes into ALERT) |
 | `arm/rig/<rig>/cmd` | display | no | when the user taps acknowledge / disarm / arm |
 | `arm/display/<display>/status` | display | yes | `online` / `offline` (last-will) |
@@ -116,7 +117,8 @@ For the detail screen's guide graph. The display **only subscribes to these whil
 
 The rig's all-sky camera image, for a quick "is it cloud?" check. Only for rigs whose bridge config has `sky_image_url`.
 
-- **`sky`** is the image itself, not JSON: a baseline JPEG that fits 320×224 (16:9 cameras come out 320×180), under 40 KB. The bridge stretches its contrast so cloud shows on a dark night image. It's only re-sent when the camera's image changes. The display subscribes to it only while that rig's screen is open.
+- **`sky`** is the image itself, not JSON: a baseline JPEG that fits 320×224 (16:9 cameras come out 320×180), under 40 KB. The bridge brightens it so cloud shows on a dark night image (the same curve for all colours, at most 5×). It's only re-sent when the camera's image changes. The display subscribes to it only while that rig's screen is open.
+- **`sky_full`** is the same image fitted to 480×320, also a baseline JPEG under 40 KB, for a full-screen view.
 - **`sky_info`** is small and goes to every display all the time, so the display knows which rigs have a sky camera:
 
 ```json

@@ -670,6 +670,38 @@ class Sky(unittest.TestCase):
         _, w, h = shrink(jpeg(2028, 1520))              # an Allsky Pi camera: was 299x224, drawn garbled
         self.assertEqual((w, h), (288, 224))
 
+    def test_full_screen_and_web_sizes(self):
+        from PIL import Image
+        import io
+        from arm.sky import FULL_BOX, MAX_BYTES, for_web, open_image, shrink
+        out, w, h = shrink(jpeg(2028, 1520), FULL_BOX)
+        self.assertEqual((w, h), (416, 320))
+        self.assertLessEqual(len(out), MAX_BYTES)
+        big = Image.open(io.BytesIO(for_web(open_image(jpeg(2028, 1520)))))
+        self.assertEqual(max(big.size), 1600)
+        small = Image.open(io.BytesIO(for_web(open_image(jpeg(640, 480)))))
+        self.assertEqual(small.size, (640, 480))            # never enlarged
+
+    def test_stretch_keeps_colour_and_caps_gain(self):
+        from PIL import Image
+        from arm.sky import MAX_GAIN, stretch_tone
+        im = Image.new("RGB", (100, 100), (20, 20, 24))
+        im.paste((24, 22, 24), (0, 0, 50, 100))             # almost flat, like a closed roof
+        a, b = stretch_tone(im).getpixel((75, 50)), stretch_tone(im).getpixel((25, 50))
+        self.assertLessEqual(max(abs(x - y) for x, y in zip(a, b)), 4 * MAX_GAIN)
+        grey = Image.linear_gradient("L").convert("RGB")
+        self.assertEqual(len(set(stretch_tone(grey).getpixel((10, 128)))), 1)
+
+    def test_web_gets_the_large_image_first(self):
+        import threading
+        from arm.sky import SkyFetcher
+        got = []
+        f = SkyFetcher("allsky", "http://x", 120, True, threading.Event(), on_web=lambda r, d: got.append((r, len(d))),
+                       fetch=lambda url: (jpeg(2028, 1520), {}), clock=lambda: T0)
+        f.run_once()
+        f.run_once()
+        self.assertEqual([r for r, _ in got], ["allsky"])   # once: the second fetch was the same image
+
     def test_image_time_from_headers(self):
         from arm.sky import image_time
         self.assertEqual(image_time({"etag": str(int(T0) - 300) + "836625d"}, T0), T0 - 300)
@@ -681,20 +713,20 @@ class Sky(unittest.TestCase):
         a, b = jpeg(640, 480, 30), jpeg(640, 480, 90)
         f = self.fetcher([(a, {}), (a, {}), OSError("timed out"), (b, {})])
         f.run_once()
-        img, info = f.take()
+        img, full, info = f.take()
         self.assertIsNotNone(img)
         self.assertEqual((info["ok"], info["w"], info["changed_ts"]), (True, 288, None))
         f.run_once()
-        img, info = f.take()
+        img, full, info = f.take()
         self.assertIsNone(img)
         self.assertTrue(info["ok"])
         f.run_once()
-        img, info = f.take()
+        img, full, info = f.take()
         self.assertIsNone(img)
         self.assertFalse(info["ok"])
         self.assertIn("timed out", info["error"])
         f.run_once()
-        img, info = f.take()
+        img, full, info = f.take()
         self.assertIsNotNone(img)
         self.assertEqual(info["changed_ts"], T0)
 
@@ -710,13 +742,13 @@ class Sky(unittest.TestCase):
 
         class FakeSky:
             kicks = 0
-            pending = (b"\xff\xd8jpeg", {"v": 1, "ok": True})
+            pending = (b"\xff\xd8jpeg", b"\xff\xd8full", {"v": 1, "ok": True})
 
             def kick(self):
                 self.kicks += 1
 
             def take(self):
-                p, self.pending = self.pending, (None, None)
+                p, self.pending = self.pending, (None, None, None)
                 return p
 
         m, s = new()
@@ -726,6 +758,7 @@ class Sky(unittest.TestCase):
         sched.step(s.t)
         topics = {t: (p, r) for t, p, r in out.msgs}
         self.assertEqual(topics["rig/test/sky"], (b"\xff\xd8jpeg", True))
+        self.assertEqual(topics["rig/test/sky_full"], (b"\xff\xd8full", True))
         self.assertTrue(topics["rig/test/sky_info"][1])
         self.assertEqual(sky.kicks, 0)
         run(m, s.stop().wait(30))
@@ -847,8 +880,13 @@ class Web(unittest.TestCase):
             page = urllib.request.urlopen(base + "/", timeout=5).read().decode()
             self.assertIn("EventSource", page)
             self.assertEqual(urllib.request.urlopen(base + "/sky/sqa55.jpg", timeout=5).read(), b"\xff\xd8img")
-            with self.assertRaises(urllib.error.HTTPError):
-                urllib.request.urlopen(base + "/sky/102ed.jpg", timeout=5)
+            large = base + "/sky/large/sqa55.jpg"
+            self.assertEqual(urllib.request.urlopen(large, timeout=5).read(), b"\xff\xd8img")     # small until there's a large one
+            hub.set_sky_large("sqa55", b"\xff\xd8big")
+            self.assertEqual(urllib.request.urlopen(large, timeout=5).read(), b"\xff\xd8big")
+            for missing in ("/sky/102ed.jpg", "/sky/large/102ed.jpg"):
+                with self.assertRaises(urllib.error.HTTPError):
+                    urllib.request.urlopen(base + missing, timeout=5)
             with self.assertRaises(urllib.error.HTTPError):
                 urllib.request.urlopen(base + "/../config.toml", timeout=5)
             ev = urllib.request.urlopen(base + "/events", timeout=5)

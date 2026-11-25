@@ -5,7 +5,8 @@ publisher calls kick() (the rig has just gone into ALERT). The image is only re-
 re-published when its bytes change. Needs Pillow (imported here only, so rigs without a sky camera
 don't need it).
 
-Output for the display: a baseline JPEG that fits SKY_BOX, small enough for the ESP32's MQTT buffer.
+Outputs: for the display, baseline JPEGs that fit SKY_BOX (beside the status column) and FULL_BOX
+(its whole screen), small enough for the ESP32's MQTT buffer; for the web page, one up to WEB_BOX.
 """
 
 import email.utils
@@ -24,6 +25,10 @@ from . import __version__
 log = logging.getLogger(__name__)
 
 SKY_BOX = (320, 224)        # fits beside the status column on the 480x320 screen
+FULL_BOX = (480, 320)       # the display's whole screen
+WEB_BOX = (1600, 1600)
+WEB_MAX_BYTES = 800_000
+MAX_GAIN = 5.0              # most a dark image is brightened
 MAX_BYTES = 40_000          # the ESP32's MQTT buffer is 48 KB
 USER_AGENT = f"astro-rig-monitor/{__version__}"
 
@@ -67,13 +72,45 @@ def image_time(headers: dict, now: float) -> Optional[float]:
     return None
 
 
-def shrink(data: bytes, box=SKY_BOX, stretch: bool = True) -> Tuple[bytes, int, int]:
-    """Fit inside box, optionally stretch contrast (night sky images are very dark), and
-    re-encode as a baseline JPEG under MAX_BYTES."""
+def open_image(data: bytes):
     from PIL import Image, ImageOps
 
-    im = Image.open(io.BytesIO(data))
-    im = ImageOps.exif_transpose(im).convert("RGB")
+    return ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+
+
+def stretch_tone(im):
+    """Brighten a dark night image. One curve for all three colours, so no false colour casts, and
+    at most MAX_GAIN, so noise and compression blocks in a near-black image aren't blown up."""
+    hist = im.convert("L").histogram()
+    cut = sum(hist) * 0.005             # ignore the darkest and brightest 0.5%
+
+    def edge(levels):
+        seen = 0
+        for v in levels:
+            seen += hist[v]
+            if seen > cut:
+                return v
+        return 0
+    lo, hi = edge(range(256)), edge(range(255, -1, -1))
+    gain = max(1.0, min(255 / max(1, hi - lo), MAX_GAIN))
+    return im.point([max(0, min(255, round((v - lo) * gain))) for v in range(256)] * 3)
+
+
+def encode(im, qualities, max_bytes: int) -> bytes:
+    """Baseline JPEG at the best of these qualities that fits max_bytes."""
+    for quality in qualities:
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=quality, progressive=False, optimize=True, subsampling="4:2:0")
+        if buf.tell() <= max_bytes:
+            break
+    return buf.getvalue()
+
+
+def shrink(data: bytes, box=SKY_BOX, stretch: bool = True, im=None) -> Tuple[bytes, int, int]:
+    """For the display: fit inside box, optionally stretch, and re-encode under MAX_BYTES."""
+    from PIL import Image
+
+    im = (im or open_image(data)).copy()
     im.thumbnail(box, Image.LANCZOS)
     # JPEGDEC (on the ESP32) draws an image whose size isn't a whole number of 16 px
     # blocks in misaligned strips, so trim to multiples of 16, keeping the centre.
@@ -82,47 +119,59 @@ def shrink(data: bytes, box=SKY_BOX, stretch: bool = True) -> Tuple[bytes, int, 
         x, y = (im.width - w) // 2, (im.height - h) // 2
         im = im.crop((x, y, x + w, y + h))
     if stretch:
-        im = ImageOps.autocontrast(im, cutoff=(0.5, 0.5))
-    for quality in (85, 75, 65, 55, 45, 35):
-        buf = io.BytesIO()
-        im.save(buf, "JPEG", quality=quality, progressive=False, optimize=True)
-        if buf.tell() <= MAX_BYTES:
-            break
-    return buf.getvalue(), im.width, im.height
+        im = stretch_tone(im)
+    return encode(im, (95, 90, 85, 75, 65, 55, 45, 35), MAX_BYTES), im.width, im.height
+
+
+def for_web(im, stretch: bool = True) -> bytes:
+    """For the web page: large, never enlarged."""
+    from PIL import Image
+
+    im = im.copy()
+    im.thumbnail(WEB_BOX, Image.LANCZOS)
+    if stretch:
+        im = stretch_tone(im)
+    return encode(im, (88, 80, 70), WEB_MAX_BYTES)
 
 
 class SkyFetcher(threading.Thread):
     def __init__(self, rig_id: str, url: str, every_s: float, stretch: bool, stop: threading.Event,
-                 fetch: Callable[[str], Tuple[bytes, dict]] = fetch_url, clock: Callable[[], float] = time.time):
+                 on_web: Optional[Callable[[str, bytes], None]] = None, fetch: Callable[[str], Tuple[bytes, dict]] = fetch_url, clock: Callable[[], float] = time.time):
         super().__init__(name=f"sky-{rig_id}", daemon=True)
         self.rig_id, self.url, self.every_s, self.stretch = rig_id, url, every_s, stretch
         self.stop, self.fetch, self.clock = stop, fetch, clock
+        self.on_web = on_web                     # gets (rig id, large JPEG) for the web page
         self.kicked = threading.Event()
         self.lock = threading.Lock()
         self._digest: Optional[str] = None
-        self._image: Optional[bytes] = None      # new image waiting to be published
+        self._image: Optional[bytes] = None      # new images waiting to be published
+        self._full: Optional[bytes] = None
         self._info: Optional[dict] = None        # new info waiting to be published
         self.changed_ts: Optional[float] = None  # when this bridge saw the image change
 
     def kick(self):
         self.kicked.set()
 
-    def take(self) -> Tuple[Optional[bytes], Optional[dict]]:
-        """For the publisher: (new JPEG or None, new info or None)."""
+    def take(self) -> Tuple[Optional[bytes], Optional[bytes], Optional[dict]]:
+        """For the publisher: (new JPEG, new full-screen JPEG, new info), each None if unchanged."""
         with self.lock:
-            image, info = self._image, self._info
-            self._image = self._info = None
-            return image, info
+            got = self._image, self._full, self._info
+            self._image = self._full = self._info = None
+            return got
 
     def run_once(self):
         now = self.clock()
         info = {"v": 1, "ts": round(now), "ok": False}
+        image = full = None
         try:
             data, headers = self.fetch(self.url)
             digest = hashlib.sha1(data).hexdigest()
-            image = None
             if digest != self._digest:
-                image, w, h = shrink(data, stretch=self.stretch)
+                im = open_image(data)
+                image, w, h = shrink(data, stretch=self.stretch, im=im)
+                full, _, _ = shrink(data, FULL_BOX, self.stretch, im=im)
+                if self.on_web:         # before the publisher announces the new image
+                    self.on_web(self.rig_id, for_web(im, self.stretch))
                 if self._digest is not None:
                     self.changed_ts = now
                 self._digest, self._size = digest, (w, h, len(image))
@@ -135,10 +184,10 @@ class SkyFetcher(threading.Thread):
         except Exception as e:      # network, HTTP, or not an image: keep the last good one
             log.warning("[%s] sky image fetch failed: %s", self.rig_id, e)
             info["error"] = str(e)[:80]
-            image = None
+            image = full = None
         with self.lock:
             if image is not None:
-                self._image = image
+                self._image, self._full = image, full
             self._info = info
 
     def run(self):

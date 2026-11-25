@@ -65,7 +65,7 @@ def main(argv=None):
         recorder = NightRecorder(rep.nights_dir, rep.keep_days)
         MorningReport(cfg.rigs, rep.nights_dir, rep.reports_dir, rep.at, rep.keep_days, stop).start()
         log.info("night reports: recording to %s, report each morning after %s", rep.nights_dir, rep.at)
-    web = None
+    web = hub = None
     if cfg.web.enabled:
         hub = WebHub({r.id: r.name or r.id for r in cfg.rigs})
         try:
@@ -88,7 +88,8 @@ def main(argv=None):
             log.info("[%s] also reading the ASIAIR app port %s (unofficial, read-only)", m.s.id, m.s.app_port)
             RigReader(m, stop, recorder, app=True).start()
 
-    sky = {r.id: SkyFetcher(r.id, r.sky_image_url, r.sky_every_s, r.sky_stretch, stop)
+    sky = {r.id: SkyFetcher(r.id, r.sky_image_url, r.sky_every_s, r.sky_stretch, stop,
+                            on_web=hub.set_sky_large if web else None)
            for r in cfg.rigs if r.sky_image_url}
     for f in sky.values():
         f.start()

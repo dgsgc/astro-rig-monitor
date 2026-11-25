@@ -3,7 +3,8 @@
 The bridge serves it itself (Python's standard library, no extra packages):
   /             the page (bridge/web_static/index.html)
   /events       Server-Sent Events: the same messages the bridge publishes over MQTT
-  /sky/<rig>.jpg  the latest all-sky image for a rig
+  /sky/<rig>.jpg  the latest all-sky image for a rig (small, as sent to the display)
+  /sky/large/<rig>.jpg  the same image, large
 
 Nothing here can change anything: there are no commands, so a tap on a phone can't disarm
 a rig. Keep it on the LAN or Tailscale; don't forward a port to it from the internet.
@@ -38,6 +39,7 @@ class WebHub:
         self.lock = threading.Lock()
         self.latest: Dict[Tuple[str, str], dict] = {}    # (rig, kind) -> payload
         self.sky: Dict[str, Tuple[bytes, float]] = {}    # rig -> (jpeg, when received)
+        self.sky_large: Dict[str, bytes] = {}            # rig -> large jpeg
         self.heartbeat: Optional[dict] = None
         self.clients = set()
 
@@ -81,6 +83,16 @@ class WebHub:
         with self.lock:
             got = self.sky.get(rid)
         return got[0] if got else None
+
+    def set_sky_large(self, rid: str, image: bytes):
+        with self.lock:
+            self.sky_large[rid] = image
+
+    def sky_large_image(self, rid: str) -> Optional[bytes]:
+        """The large image, or the small one until there is a large one."""
+        with self.lock:
+            image = self.sky_large.get(rid)
+        return image or self.sky_image(rid)
 
     def add_client(self) -> Optional[queue.Queue]:
         with self.lock:
@@ -184,7 +196,9 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str]):
                         pass
                 return self._body(404, "text/plain", b"no such report")
             if path.startswith("/sky/") and path.endswith(".jpg"):
-                image = hub.sky_image(path[5:-4])
+                rid = path[5:-4]
+                large = rid.startswith("large/")
+                image = hub.sky_large_image(rid[6:]) if large else hub.sky_image(rid)
                 if image is None:
                     return self._body(404, "text/plain", b"no image")
                 return self._body(200, "image/jpeg", image)

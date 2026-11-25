@@ -41,7 +41,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 | `filter_wheel` | none | For report labels: `true` if the plan changes filters, `false` for a one-shot colour camera |
 | `sky_image_url` | none | An all-sky camera's latest image, shown in the rig's detail view. Needs Pillow (in requirements.txt) |
 | `sky_every_s` | 120 | How often to fetch it (also fetched straight away on ALERT) |
-| `sky_stretch` | true | Stretch the contrast so cloud shows on a dark night image |
+| `sky_stretch` | true | Brighten a dark night image so cloud shows (at most 5×, colours kept) |
 | `screen_method`, `screen_window`, `screen_dithers` | "stdev", 100, true | The figure shown. See below |
 | `alert_method`, `alert_window`, `alert_min_frames` | "stdev", 30, 10 | The figure the alert levels use: dithers and settling are always left out |
 | `enabled` | true | `false` keeps a rig in the file without watching it |

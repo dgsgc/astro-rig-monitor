@@ -109,6 +109,10 @@ canvas.graph { width: 100%; height: 220px; display: block; }
 @media (min-width: 900px) { .cols { grid-template-columns: 1.4fr 1fr; } .cols.nosky { grid-template-columns: 1fr; } }
 .sky[hidden] { display: none; }
 .sky img { width: 100%; height: auto; display: block; border-radius: 8px; background: #000; }
+.sky .zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+#skyFull { width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #000; cursor: zoom-out; }
+#skyFull img { width: 100%; height: 100%; object-fit: contain; display: block; }
+html.night #skyFull { filter: sepia(1) saturate(9) hue-rotate(-50deg) brightness(.62) contrast(1.1); }
 .sky .none { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
 .sky .cap { font-size: 12px; color: var(--muted); margin-top: 6px; }
 footer { color: var(--grey); font-size: 12px; margin-top: 18px; text-align: center; }
@@ -212,6 +216,7 @@ body.detail .reports { display: none; }
     <div class="panel sky" id="sky" hidden></div>
   </div>
 </main>
+<dialog id="skyFull" aria-label="Sky picture"><img alt="All-sky camera, full screen"></dialog>
 <nav class="reports" id="reports" hidden aria-label="Night reports"></nav>
 <footer id="foot">Read-only view of the guiding bridge</footer>
 
@@ -340,6 +345,7 @@ function openDetail(id) {
   if (!openRig) fromOverview = false;
   document.body.classList.toggle("detail", !!openRig);
   $("title").textContent = openRig ? rigs.get(openRig).name : "Astro Rig Monitor";
+  if ($("skyFull").open) $("skyFull").close();
   if (openRig) { drawDetail(); drawSky(); }
   window.scrollTo(0, 0);
 }
@@ -410,9 +416,15 @@ function drawSky() {
   document.querySelector(".cols").classList.toggle("nosky", !r.skyAt);
   if (!r.skyAt) { box.textContent = ""; return; }
   let img = box.querySelector("img");
-  if (!img) { box.innerHTML = `<img alt="All-sky camera"><div class="cap"></div>`; img = box.querySelector("img"); }
-  const src = `sky/${encodeURIComponent(r.id)}.jpg?at=${r.skyAt}`;
+  if (!img) {
+    box.innerHTML = `<button class="zoom" aria-label="Show the sky picture full screen"><img alt="All-sky camera"></button><div class="cap"></div>`;
+    img = box.querySelector("img");
+    box.querySelector("button").addEventListener("click", () => { $("skyFull").showModal(); drawSky(); });
+  }
+  const src = `sky/large/${encodeURIComponent(r.id)}.jpg?at=${r.skyAt}`;
   if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+  const full = $("skyFull").querySelector("img");
+  if ($("skyFull").open && full.getAttribute("src") !== src) full.setAttribute("src", src);
   const i = r.skyInfo || {};
   const t = i.image_ts || i.ts;
   box.querySelector(".cap").textContent = (i.ok === false ? "Camera not answering · " : "") + (t ? "Image " + elapsed(nowS() - t) + " old" : "");
@@ -486,6 +498,7 @@ function route() {
   openDetail(m ? decodeURIComponent(m[1]) : null);
 }
 window.addEventListener("hashchange", route);
+$("skyFull").addEventListener("click", () => $("skyFull").close());   // anywhere, or Esc
 // Back: undo our own step if we made one (so the phone's back gesture stays in step), otherwise
 // just close the rig. Opened straight on a rig link, or in an iOS home-screen app, there may be
 // no history to go back to, so close it anyway if going back didn't.

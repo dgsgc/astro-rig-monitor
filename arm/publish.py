@@ -173,9 +173,11 @@ class Scheduler:
         if sky is not None:
             if body["level"] == "alert" and (prev is None or prev["level"] != "alert"):
                 sky.kick()            # fresh sky image for the alert
-            image, info = sky.take()
+            image, full, info = sky.take()
             if image is not None:
                 self.out.publish(f"rig/{rid}/sky", image, retain=True)
+            if full is not None:
+                self.out.publish(f"rig/{rid}/sky_full", full, retain=True)
             if info is not None:
                 self.out.publish(f"rig/{rid}/sky_info", info, retain=True)
 
