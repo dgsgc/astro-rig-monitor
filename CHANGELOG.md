@@ -1,10 +1,12 @@
 # Changes
 
-## Unreleased
+## 0.3.1 (26 November 2026)
+
+The Mac app is updated to `mac-v0.1.1` with these changes.
 
 **New**
 - **One-command install for a Raspberry Pi or Linux** (`tools/install.sh`): downloads the newest release, installs it with its own Python environment and a systemd service, and prints the setup page's address. Run it again to update; `--remove` removes it. Tested end to end on x86 and ARM Ubuntu.
-- **Windows app** (`windows/`, released separately as `win-v…`): an installer with its own Python, a tray icon with the same menu as the Mac app, and a background task that runs the monitor from login, keeps the PC awake and restarts it if it stops. No administrator rights needed. Built and tested end to end by GitHub Actions ([windows/README.md](windows/README.md)).
+- **Windows app** (`windows/`, released separately as `win-v0.1.0`): an installer with its own Python, a tray icon with the same menu as the Mac app, and a background task that runs the monitor from login, keeps the PC awake and restarts it if it stops. No administrator rights needed. Built and tested end to end by GitHub Actions ([windows/README.md](windows/README.md)).
 - The monitor exits with `ARM_RESTART_EXIT` instead of restarting itself when a supervisor sets it (the Windows launcher), so a restart never leaves a stray copy.
 - A monitor set up from another computer keeps `setup_from_lan = true`, and its web page shows the **Add rigs or change settings** link on other computers too.
 

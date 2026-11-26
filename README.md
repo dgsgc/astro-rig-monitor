@@ -55,7 +55,7 @@ One bad frame never alerts, dithers and settling are left out of the alert figur
 ## What you need
 
 - A computer that stays on through the night, on the same network as the rigs: a Raspberry Pi, a Mac, a Windows PC or a Linux box. It uses very little CPU.
-- On a Mac, nothing else: the app brings its own Python. Elsewhere, Python 3.11 or later.
+- On a Mac or Windows PC, nothing else: the apps bring their own Python. On a Raspberry Pi or Linux, Python 3.11 or later (already there on current systems).
 - Rigs running an **ASIAIR** (any model) or **PHD2** 2.6 or later with its event server on (PHD2: *Tools → Enable Server*, on by default). Give each ASIAIR a fixed address on your router (a DHCP reservation).
 - Optional: a tracker without guiding whose controller serves a JSON status page ([details](docs/configuration.md#trackers-without-guiding)).
 - Optional: an MQTT broker such as Mosquitto, only for a microcontroller display or Home Assistant.
@@ -73,9 +73,13 @@ Pick the way for the computer that will run it. Every way runs the same monitor,
 
 It lives in the menu bar, starts at login and keeps the Mac awake while it runs. Needs macOS 13 or later. More in [mac/README.md](mac/README.md).
 
-### Windows
+### Windows: the app
 
-For now, use the [manual install](#manual-install-any-computer) with Python from python.org. A Windows installer is planned.
+1. Download **Astro-Rig-Monitor-Setup.exe** from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases) (the `win-v…` release) and run it. It isn't signed with a paid certificate, so if Windows says *"Windows protected your PC"*, click **More info**, then **Run anyway**. It installs for your user only; no administrator rights needed.
+2. Your browser opens the setup page ([Setting up your rigs](#setting-up-your-rigs)).
+3. When Windows Defender Firewall asks about `pythonw.exe`, allow it on **private networks**, so your phone can open the page.
+
+It sits in the system tray, starts at login and keeps the PC awake while it runs. Needs 64-bit Windows 10 or 11. More in [windows/README.md](windows/README.md).
 
 ### Raspberry Pi and Linux
 
@@ -91,7 +95,7 @@ A Pi set up from another computer keeps allowing that (`setup_from_lan = true` i
 
 ### Manual install (any computer)
 
-For Windows, or any computer where you'd rather do it by hand. Needs Python 3.11 or later and git.
+For any computer where you'd rather do it by hand. Needs Python 3.11 or later and git.
 
 ```bash
 git clone https://github.com/dgsgc/astro-rig-monitor.git
