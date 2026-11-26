@@ -7,6 +7,8 @@ Keeps an eye on your telescope's autoguiding so you don't have to. It reads the 
 - **Night reports:** each morning, a one-page summary of last night's guiding per rig: RMS through the night, alerts, dithers, and why the plan paused (meridian flip, new target, autofocus, cloud).
 - **Build your own display:** a tablet or Raspberry Pi screen in kiosk mode, your own web page, a desktop window, an ESP32 with LEDs, or Home Assistant. A [step-by-step guide](docs/build-a-display.md) and working examples are included.
 
+**Install it in a few minutes:** [Mac app](#mac) · [Windows app](#windows) · [Raspberry Pi or Linux](#raspberry-pi-and-linux). No programming needed.
+
 **It is read-only.** It only listens to the guiding events the ASIAIR or PHD2 already broadcast on port 4400. It never sends a command to a rig, so it can't disturb a running session. ASIAIR users can optionally let it listen to the app's own port too, for autofocus, filter changes and plan progress ([details](docs/configuration.md#the-asiair-app-port-optional); unofficial, so a future firmware could change it).
 
 ## Screenshots
@@ -54,48 +56,75 @@ One bad frame never alerts, dithers and settling are left out of the alert figur
 
 ## What you need
 
-- A computer that stays on through the night, on the same network as the rigs: a Raspberry Pi, a Mac, a Windows PC or a Linux box. It uses very little CPU.
-- On a Mac or Windows PC, nothing else: the apps bring their own Python. On a Raspberry Pi or Linux, Python 3.11 or later (already there on current systems).
-- Rigs running an **ASIAIR** (any model) or **PHD2** 2.6 or later with its event server on (PHD2: *Tools → Enable Server*, on by default). Give each ASIAIR a fixed address on your router (a DHCP reservation).
-- Optional: a tracker without guiding whose controller serves a JSON status page ([details](docs/configuration.md#trackers-without-guiding)).
-- Optional: an MQTT broker such as Mosquitto, only for a microcontroller display or Home Assistant.
+- **A computer that stays on through the night,** on the same network as your rigs: a Mac, a Windows PC or a Raspberry Pi (or any Linux box). It uses very little power or CPU.
+- **Rigs running an ASIAIR** (any model) **or PHD2** 2.6 or later (on its own or with N.I.N.A.). PHD2's event server must be on: *Tools → Enable Server*, on by default. Give each ASIAIR a fixed address on your router (a DHCP reservation).
 - A remote observatory works too, over [Tailscale](https://tailscale.com) or another VPN. Don't open port 4400 to the internet.
+- Optional: a tracker without guiding whose controller serves a JSON status page ([details](docs/configuration.md#trackers-without-guiding)), and an MQTT broker such as Mosquitto, only for a microcontroller display or Home Assistant.
 
 ## Install
 
-Pick the way for the computer that will run it. Every way runs the same monitor, with the same settings file, web page, alerts and reports.
+Pick the computer that will run it. You don't need Python or a terminal on a Mac or Windows PC: the apps bring everything with them.
 
-### Mac: the app (recommended)
+| Computer | Download |
+|---|---|
+| **Mac** (macOS 13 or later) | [Apple Silicon (M1 and later)](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Apple-Silicon.zip) · [Intel](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Intel.zip) |
+| **Windows** 10 or 11 (64-bit) | [Astro-Rig-Monitor-Setup.exe](https://github.com/dgsgc/astro-rig-monitor/releases/download/win-v0.1.1/Astro-Rig-Monitor-Setup.exe) |
+| **Raspberry Pi** or Linux | one command, below |
 
-1. Download **Astro Rig Monitor for Mac** from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases) (the `mac-v…` release): `Astro-Rig-Monitor-Apple-Silicon.zip` for an M1 or later, `Astro-Rig-Monitor-Intel.zip` for an Intel Mac (Apple menu → About This Mac says which).
-2. Unzip it, drag **Astro Rig Monitor** into Applications, and open it the first time with right-click → **Open** (it isn't notarised by Apple).
-3. The setup page opens in a window of its own ([Setting up your rigs](#setting-up-your-rigs)). Allow what macOS asks: the background item and your local network.
+Each way runs the same monitor, with the same settings file, web page, alerts and reports.
 
-It lives in the menu bar, starts at login and keeps the Mac awake while it runs. Needs macOS 13 or later. More in [mac/README.md](mac/README.md).
+### Mac
 
-### Windows: the app
+1. **Download** the zip for your Mac. Not sure which? Apple menu → About This Mac: "Chip: Apple M…" is Apple Silicon, "Processor: … Intel" is Intel.
+2. **Unzip it and drag Astro Rig Monitor into Applications.** The first time, right-click it and choose **Open**, then **Open** again (it isn't notarised by Apple).
+3. **Set up:** the setup window opens by itself. Add your rigs and press **Save and start** ([details](#setting-up-your-rigs)). When macOS asks, allow the background item and access to your local network.
 
-1. Download **Astro-Rig-Monitor-Setup.exe** from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases) (the `win-v…` release) and run it. It isn't signed with a paid certificate, so if Windows says *"Windows protected your PC"*, click **More info**, then **Run anyway**. It installs for your user only; no administrator rights needed.
-2. The setup page opens in a window of its own ([Setting up your rigs](#setting-up-your-rigs)).
-3. When Windows Defender Firewall asks about `pythonw.exe`, allow it on **private networks**, so your phone can open the page.
+It lives in the menu bar (the telescope icon), starts at login and keeps the Mac awake while it runs. **To update:** choose Quit in its menu, replace the app in Applications with the new one, and open it. More in [mac/README.md](mac/README.md).
 
-It sits in the system tray, starts at login and keeps the PC awake while it runs. Needs 64-bit Windows 10 or 11. More in [windows/README.md](windows/README.md).
+### Windows
+
+1. **Download and run** `Astro-Rig-Monitor-Setup.exe`. If Windows says *"Windows protected your PC"*, click **More info**, then **Run anyway** (it isn't signed with a paid certificate). It doesn't need administrator rights.
+2. **Set up:** the setup window opens by itself. Add your rigs and press **Save and start** ([details](#setting-up-your-rigs)).
+3. **Allow the firewall:** when Windows asks about `pythonw.exe`, allow it on **private networks**, so your phone can open the page.
+
+It sits in the system tray by the clock, starts at login and keeps the PC awake while it runs. **To update:** run the new installer; your settings stay. More in [windows/README.md](windows/README.md).
 
 ### Raspberry Pi and Linux
 
-On Raspberry Pi OS (Bookworm or later), Debian 12+ or Ubuntu 24.04+, paste this into a terminal on the Pi, as your normal user:
+For Raspberry Pi OS (Bookworm or later), Debian 12+ or Ubuntu 24.04+.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/dgsgc/astro-rig-monitor/main/tools/install.sh | bash
-```
+1. **Install:** paste this into a terminal on the Pi, as your normal user (it asks for your password once, to add the service):
 
-It installs the newest release in `~/astro-rig-monitor` with its own Python environment, runs it as a service that starts at boot, and prints the address of the [setup page](#setting-up-your-rigs) to open from your phone or computer. It asks for your password to add the service. Run the same command again to update; your settings stay. To remove it, add ` -s -- --remove` after `bash`. The log is `~/astro-rig-monitor/arm.log`.
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/dgsgc/astro-rig-monitor/main/tools/install.sh | bash
+   ```
 
-A Pi set up from another computer keeps allowing that (`setup_from_lan = true` in `config.toml`), so **Add rigs or change settings** works from your phone too.
+2. **Set up:** open the address it prints (`http://<the Pi's address>:8080/setup`) on your phone or computer. Add your rigs and press **Save and start** ([details](#setting-up-your-rigs)).
 
-### Manual install (any computer)
+It runs as a service that starts at boot. **To update:** run the same command again; your settings stay. **To remove:** add ` -s -- --remove` after `bash`. The log is `~/astro-rig-monitor/arm.log`.
 
-For any computer where you'd rather do it by hand. Needs Python 3.11 or later and git.
+**Want to do it by hand instead?** See [Manual install (optional)](#manual-install-optional).
+
+## Setting up your rigs
+
+The setup page opens by itself the first time (on a Pi, open the address the installer printed). Add each rig, choose your alerts and press **Save and start**. Then open `http://<that computer's address>:8080` on your phone: the Mac and Windows apps' menus have **Open on Your Phone…** with a QR code. On an iPhone, *Share → Add to Home Screen* makes it open like an app.
+
+- **Listen to detect:** for each rig, the page can listen to it for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Do it while the rig is guiding and there's almost nothing to answer. It sends an ASIAIR nothing. PHD2 is asked one read-only question, its guide scale (`get_pixel_scale`), so you don't have to look it up; that's the only thing any part of the monitor ever sends to a rig, and the running monitor sends nothing.
+- **Remote observatory:** use the PC's address on [Tailscale](https://tailscale.com) or another VPN. Never open port 4400 to the internet.
+- **All-sky camera (optional):** paste the address of the camera's latest picture (on its web page, right-click the picture and Copy Image Address; a Dropbox share link works too, and the page makes it a direct link). **Check** fetches it once and shows how it will look. The next rig gets the same address, since rigs at one site share a sky.
+- **Phone alerts:** the free [ntfy](https://ntfy.sh) app (the page makes a private topic and has a test button) and/or a Discord webhook.
+- **Adding rigs later:** the web page has an **Add rigs or change settings** link at the bottom when you open it on the monitor's own computer (`http://localhost:8080`; in the Mac and Windows apps, **Add Rigs or Change Settings…**; a Pi set up from another computer allows it from your phone too). Adding a rig keeps everything already in the file; starting again keeps the old file as a backup. The monitor restarts itself with the new settings.
+- **Settings the page doesn't cover** are in `config.toml` ([every setting](docs/configuration.md)). After editing it, restart the monitor (Mac and Windows apps: **More → Restart Monitor**; Raspberry Pi: `sudo systemctl restart astro-rig-monitor`; manual install: run the service installer again).
+
+## Setting the levels
+
+Total RMS in arcseconds, √(RA² + Dec²). A common starting point is WARN at about half your **imaging** pixel scale and ALERT at about 0.8×, then adjust after a night or two using the morning report. For example, at 1″/px imaging: `warn = 0.6`, `alert = 0.9`; at 3″/px: `warn = 1.0`, `alert = 1.5`.
+
+The figure on the web page is meant to match what your ASIAIR or NINA shows; see [configuration](docs/configuration.md#matching-the-numbers-you-see) for the settings that control it.
+
+## Manual install (optional)
+
+You don't need this if you used an app or the Pi command above. It's for running from the source code, on any computer, by hand. Needs Python 3.11 or later and git.
 
 ```bash
 git clone https://github.com/dgsgc/astro-rig-monitor.git
@@ -111,30 +140,13 @@ On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`. The first
 
 | System | Install / update | Remove |
 |---|---|---|
-| Raspberry Pi, Linux (or use the one-command install above) | `tools/install_service_linux.sh` | `tools/install_service_linux.sh --remove` |
-| Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File tools\install_service_windows.ps1` | same with `-Remove` |
+| Raspberry Pi, Linux | `tools/install_service_linux.sh` | `tools/install_service_linux.sh --remove` |
+| Windows (PowerShell, if not using the app) | `powershell -ExecutionPolicy Bypass -File tools\install_service_windows.ps1` | same with `-Remove` |
 | macOS (if not using the app) | `tools/install_service_mac.sh` | `tools/install_service_mac.sh --remove` |
 
 Each installer copies the program and your `config.toml` to `~/astro-rig-monitor` (Windows: `%USERPROFILE%\astro-rig-monitor`), makes its own Python environment there, and starts the service. Run it again after updating the code (`git pull`) or changing `config.toml`. The log is `arm.log` in that folder. To keep your `config.toml` somewhere else (say, a private folder or repo), add `--config <path>` (Windows: `-Config <path>`).
 
 The service runs from its own copy of `config.toml`. Changes made on the setup page go into that copy, so if you keep the original elsewhere, copy them back before running the installer again (it overwrites the copy).
-
-## Setting up your rigs
-
-The setup page opens the first time (in the Mac app, by itself). Add each rig, choose your alerts and press **Save and start**. Then open `http://<that computer's address>:8080` on your phone (the Mac app's menu has **Open on Your Phone…** with a QR code).
-
-- **Listen to detect:** for each rig, the page can listen to it for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Do it while the rig is guiding and there's almost nothing to answer. It sends an ASIAIR nothing. PHD2 is asked one read-only question, its guide scale (`get_pixel_scale`), so you don't have to look it up; that's the only thing any part of the monitor ever sends to a rig, and the running monitor sends nothing.
-- **Remote observatory:** use the PC's address on [Tailscale](https://tailscale.com) or another VPN. Never open port 4400 to the internet.
-- **All-sky camera (optional):** paste the address of the camera's latest picture (on its web page, right-click the picture and Copy Image Address; a Dropbox share link works too, and the page makes it a direct link). **Check** fetches it once and shows how it will look. The next rig gets the same address, since rigs at one site share a sky.
-- **Phone alerts:** the free [ntfy](https://ntfy.sh) app (the page makes a private topic and has a test button) and/or a Discord webhook.
-- **Adding rigs later:** the web page has an **Add rigs or change settings** link at the bottom when you open it on the monitor's own computer (`http://localhost:8080`; in the Mac app, **Add Rigs or Change Settings…**). Adding a rig keeps everything already in the file; starting again keeps the old file as a backup. The monitor restarts itself with the new settings.
-- **Settings the page doesn't cover** are in `config.toml` ([every setting](docs/configuration.md)). After editing it, restart the monitor (Mac app: **More → Restart Monitor**; manual install: run the service installer again).
-
-## Setting the levels
-
-Total RMS in arcseconds, √(RA² + Dec²). A common starting point is WARN at about half your **imaging** pixel scale and ALERT at about 0.8×, then adjust after a night or two using the morning report. For example, at 1″/px imaging: `warn = 0.6`, `alert = 0.9`; at 3″/px: `warn = 1.0`, `alert = 1.5`.
-
-The figure on the web page is meant to match what your ASIAIR or NINA shows; see [configuration](docs/configuration.md#matching-the-numbers-you-see) for the settings that control it.
 
 ## Documentation
 

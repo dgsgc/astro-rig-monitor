@@ -54,3 +54,10 @@ Any rig setting can be overridden in the replay to try alternatives, e.g. `--scr
 
 - **Never write to a rig's socket.** Connections to port 4400 are listen-only. PHD2's JSON-RPC on the same port could control guiding; it isn't used.
 - Alerting must never wait on anything slow: the web page, notifications, sky images and reports run on their own threads.
+
+## Releasing
+
+1. Bump `arm/__init__.py` (the monitor), and `mac/VERSION` / `windows/VERSION` for app changes; add a `CHANGELOG.md` entry.
+2. Tag `v…` (the monitor, marked **Latest**: the Pi installer falls back to the latest-release page), `mac-v…` and `win-v…` (never marked Latest). The Mac zips come from `mac/build.sh`, the Windows installer from the `windows app` workflow's artifact on `main`.
+3. **Update the direct download links in the README's Install table** to the new `mac-v…` / `win-v…` tags.
+
