@@ -26,12 +26,18 @@ def fake_probe(host, port, say=print):
             "guide_scale": 1.09, "guiding": True}
 
 
+def fake_sky(url):
+    if "bad" in url:
+        return {"error": "that's a web page, not a picture"}
+    return {"url": url, "preview": b"\xff\xd8jpeg", "width": 1280, "height": 960, "age_s": 30}
+
+
 class SetupPage(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.dir.name, "config.toml")
         self.saved = threading.Event()
-        self.svc = SetupService(self.path, probe=fake_probe, on_saved=self.saved.set)
+        self.svc = SetupService(self.path, probe=fake_probe, on_saved=self.saved.set, sky_check=fake_sky)
         self.stop = threading.Event()
         self.srv = WebServer(WebHub({}), "127.0.0.1", 0, self.stop, setup=self.svc, setup_only=True)
         self.srv.start()
@@ -144,6 +150,73 @@ class SetupPage(unittest.TestCase):
         self.assertEqual(got["found"]["guide_scale"], 1.09)
         code, _ = self.call("/setup/api/probe", {"host": "bad host!"})
         self.assertEqual(code, 400)
+
+
+    def test_sky_check_and_save(self):
+        code, r = self.call("/setup/api/sky", {"url": "http://allsky.local/image.jpg"})
+        self.assertEqual(code, 200, r)
+        got = json.loads(r)
+        self.assertTrue(got["preview"].startswith("data:image/jpeg;base64,"))
+        self.assertEqual((got["width"], got["age_s"]), (1280, 30))
+        code, r = self.call("/setup/api/sky", {"url": "http://bad.example/page"})
+        self.assertEqual(code, 400)
+        self.assertIn(b"web page", r)
+        code, _ = self.call("/setup/api/sky", {"url": "http://allsky.local/image.jpg"}, token=False)
+        self.assertEqual(code, 403)
+
+        sky = "https://www.dropbox.com/scl/fi/abc/image.jpg?rlkey=k&dl=0"
+        code, r = self.call("/setup/api/save", {"mode": "new", "rigs": [dict(RIG, sky_image_url=sky)]})
+        self.assertEqual(code, 200, r)
+        self.assertEqual(load(self.path).rigs[0].sky_image_url,
+                         "https://www.dropbox.com/scl/fi/abc/image.jpg?rlkey=k&raw=1")
+
+
+class Sky(unittest.TestCase):
+    def test_clean_url(self):
+        from arm.sky import clean_url
+        self.assertEqual(clean_url("  http://allsky.local/current/image.jpg "), "http://allsky.local/current/image.jpg")
+        self.assertEqual(clean_url("https://dropbox.com/s/x/a.jpg?dl=1"), "https://dropbox.com/s/x/a.jpg?raw=1")
+        self.assertEqual(clean_url(""), "")
+        for bad in ("allsky.local/image.jpg", "file:///etc/passwd", "http://a b/c.jpg"):
+            with self.assertRaises(ValueError):
+                clean_url(bad)
+
+    def test_check_says_what_is_wrong(self):
+        import urllib.error
+        from arm.sky import check
+
+        def page(url):
+            return b"<!DOCTYPE html><html>Allsky</html>", {"content-type": "text/html; charset=utf-8"}
+
+        def refused(url):
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)
+
+        def junk(url):
+            return b"not a picture", {"content-type": "application/octet-stream"}
+
+        self.assertIn("web page", check("http://allsky.local/", fetch=page)["error"])
+        self.assertIn("login", check("http://allsky.local/a.jpg", fetch=refused)["error"])
+        self.assertIn("http", check("allsky.local/a.jpg", fetch=page)["error"])
+        try:
+            import PIL  # noqa: F401
+        except ImportError:
+            return
+        self.assertIn("isn't a picture", check("http://allsky.local/a.jpg", fetch=junk)["error"])
+
+    def test_check_gives_a_preview(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs Pillow")
+        import io
+        from arm.sky import check
+        buf = io.BytesIO()
+        Image.new("RGB", (1280, 960), (10, 10, 30)).save(buf, "JPEG")
+        got = check("http://allsky.local/a.jpg", fetch=lambda u: (buf.getvalue(), {
+            "content-type": "image/jpeg", "last-modified": "Thu, 26 Nov 2026 16:00:00 GMT"}),
+            now=lambda: 1795708800 + 300)
+        self.assertEqual((got["width"], got["height"], got["age_s"]), (1280, 960, 300))
+        self.assertTrue(got["preview"].startswith(b"\xff\xd8"))
 
 
 class MakeRig(unittest.TestCase):

@@ -171,7 +171,7 @@ def rig_id(name: str, taken: Iterable[str]) -> str:
     return rid
 
 
-def ask_rig(a: Asker, taken: List[str], probe=listen) -> dict:
+def ask_rig(a: Asker, taken: List[str], probe=listen, sky_default: Optional[str] = None) -> dict:
     rig: dict = {}
     rig["name"] = a.text("Rig name, as shown on the page (e.g. 'Refractor')")
     rig["id"] = rig_id(rig["name"], taken)
@@ -222,7 +222,40 @@ def ask_rig(a: Asker, taken: List[str], probe=listen) -> dict:
         rig["planned_stop_grace_s"] = 600
     rig["filter_wheel"] = a.yes("Does the imaging plan change filters? (for pause labels in the report)",
                                 False)
+    ask_sky(a, rig, sky_default)
     return rig
+
+
+def ask_sky(a: Asker, rig: dict, default: Optional[str]) -> None:
+    """Optional: the address of an all-sky camera's latest picture, shown with the rig."""
+    from .sky import check, clean_url
+    a.say("  All-sky camera (optional): the address of its latest picture. On the camera's page,"
+          " right-click the picture and Copy Image Address. A Dropbox share link works too.")
+    while True:
+        url = a.text("All-sky picture address (" + ("Enter keeps the last rig's, none to skip)" if default
+                                                    else "Enter to skip)"), default, required=False)
+        if not url or url.lower() == "none":
+            return
+        if url == default:                  # the last rig's, already checked
+            rig["sky_image_url"] = url
+            return
+        try:
+            url = clean_url(url)
+        except ValueError as e:
+            a.say(f"  {e}.")
+            continue
+        got = check(url)
+        if got.get("error"):
+            a.say(f"  Couldn't use it: {got['error']}.")
+            if a.yes("Keep it anyway?", False):
+                rig["sky_image_url"] = url
+                return
+            continue
+        age = got.get("age_s")
+        a.say(f"  Got a {got['width']}x{got['height']} picture"
+              + (f", taken {age // 60} min ago." if age is not None else "."))
+        rig["sky_image_url"] = url
+        return
 
 
 def make_rig(ans: dict, taken: Iterable[str]) -> dict:
@@ -249,7 +282,11 @@ def make_rig(ans: dict, taken: Iterable[str]) -> dict:
     if dialect not in ("asiair", "phd2", "tracker"):
         raise ValueError(f"unknown rig type {dialect!r}")
     rig: dict = {"name": name, "id": rig_id(name, taken), "host": host, "dialect": dialect}
+    from .sky import clean_url
+    sky = clean_url(str(ans.get("sky_image_url") or ""))
     if dialect == "tracker":
+        if sky:
+            rig["sky_image_url"] = sky
         return rig
     rig["port"] = int(num("port", 4400))
     units = ans.get("units") or ("arcsec" if dialect == "asiair" else "pixels")
@@ -268,6 +305,8 @@ def make_rig(ans: dict, taken: Iterable[str]) -> dict:
     else:
         rig["planned_stop_grace_s"] = 600
     rig["filter_wheel"] = bool(ans.get("filter_wheel"))
+    if sky:
+        rig["sky_image_url"] = sky
     return rig
 
 
@@ -328,7 +367,8 @@ def main(argv=None, ask: Callable[[str], str] = input, say: Callable[[str], None
     rigs: List[dict] = []
     while True:
         say(f"\nRig {len(rigs) + 1}")
-        rigs.append(ask_rig(a, [r["id"] for r in rigs], probe))
+        last_sky = next((r["sky_image_url"] for r in reversed(rigs) if r.get("sky_image_url")), None)
+        rigs.append(ask_rig(a, [r["id"] for r in rigs], probe, last_sky))
         if not a.yes("\nAdd another rig?", False):
             break
 

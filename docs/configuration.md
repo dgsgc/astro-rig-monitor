@@ -40,7 +40,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 | `lat`, `lon` | none | Site position, degrees (north and east positive). See [End of the night](#end-of-the-night) |
 | `dawn_sun_alt` | -18 | Sun altitude that counts as dawn |
 | `filter_wheel` | none | For report labels: `true` if the plan changes filters, `false` for a one-shot colour camera |
-| `sky_image_url` | none | An all-sky camera's latest image, shown in the rig's detail view. Needs Pillow (in requirements.txt) |
+| `sky_image_url` | none | An all-sky camera's latest image, shown in the rig's detail view. Needs Pillow (in requirements.txt). The setup page can check it. For Dropbox use a share link ending `raw=1` (the setup page changes `dl=0` for you) |
 | `sky_every_s` | 120 | How often to fetch it (also fetched straight away on ALERT) |
 | `sky_stretch` | true | Brighten a dark night image so cloud shows (at most 5×, colours kept) |
 | `screen_method`, `screen_window`, `screen_dithers` | "stdev", 100, true | The figure shown. See below |

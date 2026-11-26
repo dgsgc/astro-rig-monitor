@@ -53,6 +53,7 @@ button:disabled { opacity: .5; cursor: default; }
 .found { font-size: 13px; margin-top: 8px; color: var(--text2); }
 .found.good { color: var(--green-lt); }
 .found.bad { color: var(--red-lt); }
+.skyPreview { display: block; max-width: 100%; margin-top: 8px; border-radius: 6px; }
 .msg { margin: 12px 0; padding: 10px 12px; border-radius: 10px; display: none; }
 .msg.show { display: block; }
 .msg.bad { background: #501313; color: var(--red-lt); }
@@ -176,6 +177,15 @@ a { color: var(--accent); }
         <span>PHD2 is run by NINA or another sequencer that stops guiding for autofocus</span></label>
       <label class="check full fwL"><input type="checkbox" class="fw">
         <span>The imaging plan changes filters (only used to label pauses in the night report)</span></label>
+      <div class="full skyBox">
+        <label>All-sky camera (optional): address of its latest picture
+          <input type="url" class="sky" placeholder="e.g. http://allsky.local/image.jpg" autocapitalize="off" spellcheck="false"></label>
+        <div class="row"><button type="button" class="skyCheck">Check</button>
+          <span class="hint">Shown with the rig, so you can see if it's cloud. On the camera's web page, right-click
+            the latest picture and choose Copy Image Address. A Dropbox share link works too.</span></div>
+        <div class="found skyFound" hidden></div>
+        <img class="skyPreview" alt="All-sky preview" hidden>
+      </div>
       <p class="hint full trackerHint">The monitor reads <code>http://&lt;address&gt;/status</code> every 10 s.
         It never sends commands to the tracker.</p>
     </div>
@@ -237,6 +247,10 @@ function addRig() {
   q("units").addEventListener("change", show);
   q("remove").addEventListener("click", () => { el.remove(); renumber(); });
   q("listen").addEventListener("click", () => listen(el, q, show));
+  q("skyCheck").addEventListener("click", () => checkSky(q));
+  q("sky").addEventListener("input", () => { q("skyFound").hidden = q("skyPreview").hidden = true; });
+  const prev = $("rigs").querySelectorAll(".rig");
+  if (prev.length) q("sky").value = prev[prev.length - 1].querySelector(".sky").value;   // same site, same sky
   $("rigs").appendChild(el);
   show();
   renumber();
@@ -294,6 +308,29 @@ async function listen(el, q, show) {
   }
 }
 
+async function checkSky(q) {
+  const out = q("skyFound"), img = q("skyPreview"), btn = q("skyCheck");
+  out.hidden = false;
+  out.className = "found skyFound";
+  out.textContent = "Fetching the picture…";
+  img.hidden = true;
+  btn.disabled = true;
+  try {
+    const r = await api("sky", {url: q("sky").value.trim()});
+    if (r.url !== q("sky").value.trim()) q("sky").value = r.url;     // e.g. a Dropbox link made direct
+    const age = r.age_s == null ? "" : r.age_s < 120 ? ", taken just now" : ", taken " + Math.round(r.age_s / 60) + " min ago";
+    out.className = "found skyFound good";
+    out.textContent = "Got a " + r.width + "×" + r.height + " picture" + age + ". This is how it will look (brightened so cloud shows):";
+    img.src = r.preview;
+    img.hidden = false;
+  } catch (e) {
+    out.className = "found skyFound bad";
+    out.textContent = e.message + ".";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function rigAnswers() {
   return Array.from($("rigs").querySelectorAll(".rig"), (el) => {
     const q = (c) => el.querySelector("." + c);
@@ -301,6 +338,7 @@ function rigAnswers() {
       name: q("name").value.trim(), host: q("host").value.trim(), dialect: q("dialect").value,
       port: q("port").value, units: q("units").value, guide_scale: q("scale").value,
       warn: q("warn").value, alert: q("alert").value, nina: q("nina").checked, filter_wheel: q("fw").checked,
+      sky_image_url: q("sky").value.trim(),
     };
   });
 }

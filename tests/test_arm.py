@@ -1463,10 +1463,12 @@ class Setup(unittest.TestCase):
         answers = iter([
             "Refractor", "192.168.1.50", "", "y",      # name, host, port, listen
             "", "", "y",                               # warn, alert (defaults), plan changes filters
+            "http://127.0.0.1:9/sky.jpg", "y",         # all-sky picture: can't be fetched, keep it anyway
             "y",                                       # another rig
             "Observatory", "100.64.0.10", "4400", "n", # no listening
             "n",                                       # not an ASIAIR: PHD2
             "4.6", "1.0", "1.5", "y", "n",             # guide scale, levels, NINA, filters
+            "",                                        # all-sky: Enter keeps the last rig's
             "n",                                       # no more rigs
             "51.5", "-0.1",                            # site
             "", "y",                                   # web port, reports
@@ -1488,6 +1490,7 @@ class Setup(unittest.TestCase):
         self.assertEqual((obs.dialect, obs.units, obs.guide_scale, obs.planned_stop_grace_s, obs.screen_dithers),
                          ("phd2", "pixels", 4.6, 300, False))
         self.assertEqual((ref.lat, ref.lon), (51.5, -0.1))
+        self.assertEqual((ref.sky_image_url, obs.sky_image_url), ("http://127.0.0.1:9/sky.jpg",) * 2)
         self.assertTrue(cfg.web.enabled and cfg.report.enabled and cfg.notify.enabled)
         self.assertTrue(cfg.notify.ntfy_url.startswith("https://ntfy.sh/arm-"))
         self.assertGreater(len(cfg.notify.ntfy_url), 35)

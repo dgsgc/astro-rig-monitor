@@ -17,6 +17,7 @@ Safety:
   the existing file and appends to it.
 """
 
+import base64
 import json
 import logging
 import os
@@ -40,8 +41,10 @@ HOST_RE = re.compile(r"[A-Za-z0-9.:_\-\[\]]+")
 
 class SetupService:
     def __init__(self, config_path: str, allow_lan: bool = False, probe=listen,
-                 on_saved: Optional[Callable[[], None]] = None):
+                 on_saved: Optional[Callable[[], None]] = None, sky_check=None):
+        from .sky import check
         self.path = config_path
+        self.sky_check = sky_check or check
         self.allow_lan = allow_lan
         self.probe = probe
         self.on_saved = on_saved
@@ -99,10 +102,11 @@ class SetupService:
                 with self.lock:
                     got = self.jobs.get(job)
                 self._json(h, 200 if got else 404, got or {"error": "no such listen"})
-            elif method == "POST" and path in ("/setup/api/probe", "/setup/api/save", "/setup/api/test-notify"):
+            elif method == "POST" and path in ("/setup/api/probe", "/setup/api/save", "/setup/api/test-notify",
+                                                  "/setup/api/sky"):
                 body = self._read(h)
                 fn = {"/setup/api/probe": self.start_probe, "/setup/api/save": self.save,
-                      "/setup/api/test-notify": self.test_notify}[path]
+                      "/setup/api/test-notify": self.test_notify, "/setup/api/sky": self.check_sky}[path]
                 self._json(h, 200, fn(body))
             else:
                 self._json(h, 404, {"error": "not found"})
@@ -179,6 +183,14 @@ class SetupService:
 
         threading.Thread(target=run, name="setup-listen", daemon=True).start()
         return {"job": job}
+
+    def check_sky(self, body: dict) -> dict:
+        """Fetch an all-sky picture once and return a preview (the camera is only read)."""
+        got = self.sky_check(str(body.get("url") or ""))
+        if got.get("error"):
+            raise ValueError(got["error"])
+        return {"url": got["url"], "width": got["width"], "height": got["height"], "age_s": got["age_s"],
+                "preview": "data:image/jpeg;base64," + base64.b64encode(got["preview"]).decode()}
 
     def test_notify(self, body: dict) -> dict:
         from .config import NotifySettings

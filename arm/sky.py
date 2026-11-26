@@ -17,6 +17,8 @@ import re
 import ssl
 import threading
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Callable, Optional, Tuple
 
@@ -52,6 +54,64 @@ def fetch_url(url: str, timeout: float = 30) -> Tuple[bytes, dict]:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout, context=_TLS) as r:
         return r.read(), {k.lower(): v for k, v in r.headers.items()}
+
+
+def clean_url(raw: str) -> str:
+    """The address of an all-sky camera's latest picture, as typed. A Dropbox share link
+    (…?dl=0) gives Dropbox's web page, so it's changed to raw=1, which gives the picture.
+    Raises ValueError for something that isn't a web address."""
+    url = (raw or "").strip()
+    if not url:
+        return ""
+    if not re.match(r"^https?://[^\s/]+", url) or re.search(r"\s", url):
+        raise ValueError("the all-sky address must start with http:// or https://")
+    parts = urllib.parse.urlsplit(url)
+    host = parts.hostname or ""
+    if host == "dropbox.com" or host.endswith(".dropbox.com"):
+        q = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+             if k not in ("dl", "raw")]
+        url = urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(q + [("raw", "1")])))
+    return url
+
+
+def check(url: str, fetch: Callable[[str], Tuple[bytes, dict]] = None, now: Callable[[], float] = time.time) -> dict:
+    """Fetch the picture once, as the monitor will, for the setup page. Returns a small preview
+    (JPEG bytes), its size and age, or {"error": "<plain words>"}."""
+    try:
+        url = clean_url(url)
+    except ValueError as e:
+        return {"error": str(e)}
+    if not url:
+        return {"error": "enter the address of the camera's latest picture"}
+    try:
+        data, headers = (fetch or (lambda u: fetch_url(u, timeout=20)))(url)
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return {"error": f"the server refused ({e.code}): it may need a login, or the picture isn't shared publicly"}
+        if e.code == 404:
+            return {"error": "nothing at that address (404)"}
+        return {"error": f"the server answered {e.code}"}
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        reason = getattr(e, "reason", e)
+        return {"error": f"couldn't fetch it ({reason})"}
+    kind = headers.get("content-type", "").split(";")[0].strip().lower()
+    head = data[:512].lstrip().lower()
+    if kind in ("text/html", "application/xhtml+xml") or head.startswith((b"<!doctype", b"<html")):
+        if "dropbox.com" in url:
+            return {"error": "Dropbox gave a web page, not the picture. Check the link is the picture's own "
+                             "share link (Share → Copy link) and that anyone with the link can view it"}
+        return {"error": "that's a web page, not a picture. On the camera's page, right-click the "
+                         "latest picture and choose Copy Image Address"}
+    try:
+        im = open_image(data)
+    except ImportError:
+        return {"error": "showing all-sky pictures needs Pillow (pip install Pillow)"}
+    except Exception:
+        return {"error": "that isn't a picture the monitor can read (JPEG or PNG work)"}
+    preview, _, _ = shrink(data, SKY_BOX, True, im=im)
+    t = image_time(headers, now())
+    return {"url": url, "preview": preview, "width": im.width, "height": im.height,
+            "age_s": None if t is None else max(0, round(now() - t))}
 
 
 def image_time(headers: dict, now: float) -> Optional[float]:
