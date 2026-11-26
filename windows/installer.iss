@@ -50,6 +50,9 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\python\pythonw.exe"; Parameters: "-s -B -m armwin.tray"; WorkingDir: "{app}"; Description: "Start Astro Rig Monitor"; Flags: postinstall nowait skipifsilent
+; A silent update doesn't start the tray icon, so start the monitor's task again here (a monitor
+; that was turned off has a disabled task, which this leaves alone; no task yet: nothing happens).
+Filename: "{sys}\schtasks.exe"; Parameters: "/Run /TN ""Astro Rig Monitor"""; Flags: runhidden; Check: WizardSilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"

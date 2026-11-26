@@ -55,6 +55,10 @@ Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:8080/setu
 Wait-For "http://127.0.0.1:8080/state.json" "second_rig" | Out-Null
 Get-Content "$Data\console.log" -Tail 5
 
+Write-Host "== a silent update over the running monitor starts it again"
+Start-Process $Exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+Wait-For "http://127.0.0.1:8080/state.json" "second_rig" | Out-Null
+
 Write-Host "== stopping the task leaves no monitor behind"
 & $Py -s -B -m armwin.task stop
 Start-Sleep 3

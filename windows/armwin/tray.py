@@ -262,11 +262,14 @@ def build_menu(model: Model, act: Actions):
 
 
 def ensure_task() -> bool:
-    """Install or update the scheduled task unless the monitor was deliberately turned off.
-    True if it was (re)installed just now."""
+    """Install or update the scheduled task unless the monitor was deliberately turned off, and
+    make sure it's running (an installer stops it to replace the files). True if it was
+    (re)installed just now."""
     if task.state().get("off"):
         return False
     if task.installed() and not task.out_of_date():
+        if task.status() != "Running":
+            task.start()
         return False
     task.install()
     return True
