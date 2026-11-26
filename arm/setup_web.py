@@ -274,7 +274,8 @@ class SetupService:
                 if not HOST_RE.fullmatch(str(m["host"])):
                     raise ValueError("the MQTT broker address doesn't look right")
                 mqtt = {"host": str(m["host"]), "port": int(m.get("port") or 1883)}
-            text = render(rigs, site, web_port, bool(body.get("report")), notify, mqtt)
+            text = render(rigs, site, web_port, bool(body.get("report")), notify, mqtt,
+                          setup_from_lan=self.allow_lan)     # set up from elsewhere: keep it possible
             text = text.replace("written by `python -m arm setup`", "written by the setup page", 1)
 
         tmp = self.path + ".new"

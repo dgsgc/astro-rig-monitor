@@ -331,12 +331,15 @@ def fmt(v) -> str:
 
 
 def render(rigs: List[dict], site: Optional[tuple], web_port: Optional[int], report: bool,
-           notify: Optional[dict], mqtt: Optional[dict]) -> str:
+           notify: Optional[dict], mqtt: Optional[dict], setup_from_lan: bool = False) -> str:
     out = ["# Astro Rig Monitor settings, written by `python -m arm setup`.",
            "# Every setting is explained in config.example.toml and docs/configuration.md.",
            "", 'bridge_id = "main"', 'log_file = "arm.log"', ""]
     if web_port:
-        out += ["[web]", f"port = {web_port}", ""]
+        out += ["[web]", f"port = {web_port}"]
+        if setup_from_lan:
+            out.append("setup_from_lan = true   # set up from another computer, so it can change these settings too")
+        out.append("")
     if report:
         out += ["[report]", 'at = "08:00"', "keep_days = 30", ""]
     if notify:

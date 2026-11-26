@@ -171,6 +171,18 @@ class SetupPage(unittest.TestCase):
                          "https://www.dropbox.com/scl/fi/abc/image.jpg?rlkey=k&raw=1")
 
 
+class FromAnotherComputer(unittest.TestCase):
+    def test_set_up_from_the_network_stays_possible(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "config.toml")
+            svc = SetupService(path, allow_lan=True, probe=fake_probe, sky_check=fake_sky)
+            svc.save({"mode": "new", "rigs": [RIG], "web_port": 8080})
+            self.assertTrue(load(path).web.setup_from_lan)
+            path2 = os.path.join(d, "local.toml")
+            SetupService(path2, probe=fake_probe, sky_check=fake_sky).save({"mode": "new", "rigs": [RIG], "web_port": 8080})
+            self.assertFalse(load(path2).web.setup_from_lan)
+
+
 class NetworkHint(unittest.TestCase):
     def test_hint_only_for_a_refused_local_network_on_a_mac(self):
         from arm import setup_web
