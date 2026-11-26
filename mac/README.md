@@ -25,8 +25,8 @@ Needs macOS 13 Ventura or later.
 | | |
 |---|---|
 | Status | Running and how many rigs, not set up yet, or stopped |
-| On your phone: http://… | The address to open on your phone (click to copy) |
-| Open Monitor Page | The live web page |
+| Open in Browser on This Mac | The live web page |
+| Open on Your Phone… | A QR code to scan with your phone's camera, and the address to type or copy. The phone must be on the same WiFi. |
 | Add Rigs or Change Settings… | The setup page: add rigs, or start again (the old settings are kept as a backup) |
 | Send Test Notification | Checks your ntfy or Discord alerts arrive |
 | More → Edit Settings File… | `config.toml` in TextEdit, for settings the setup page doesn't cover ([configuration.md](../docs/configuration.md)). Then **Restart Monitor**. |

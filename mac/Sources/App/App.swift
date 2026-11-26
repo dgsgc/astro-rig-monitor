@@ -6,6 +6,7 @@
 // it never talks to the rigs.
 
 import AppKit
+import CoreImage
 import ServiceManagement
 import SwiftUI
 
@@ -47,13 +48,15 @@ struct MenuContent: View {
 
     var body: some View {
         Text(model.statusLine)
-        if let phone = model.phoneAddress {
-            Button("On your phone: \(phone)") { model.copy(phone) }
-        }
         Divider()
-        Button("Open Monitor Page") { model.openPage("/") }
+        Button("Open in Browser on This Mac") { model.openPage("/") }
             .keyboardShortcut("o")
             .disabled(!model.hasConfig)
+        Button(model.hasConfig && model.phoneAddress == nil ? "Open on Your Phone (No Network)" : "Open on Your Phone…") {
+            model.showPhone()
+        }
+            .disabled(model.phoneAddress == nil)
+        Divider()
         Button(model.hasConfig ? "Add Rigs or Change Settings…" : "Set Up…") { model.openPage("/setup") }
         Button("Send Test Notification") { model.testNotify() }
             .disabled(!model.hasConfig)
@@ -234,6 +237,44 @@ final class Model: ObservableObject {
         NSPasteboard.general.setString(s, forType: .string)
     }
 
+    /// A QR code for the phone's camera, with the address to type or copy.
+    func showPhone() {
+        guard let address = phoneAddress else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = "Open the monitor on your phone"
+        a.informativeText = "Point your phone's camera at the code and tap the link, or type this address "
+            + "into its browser:\n\n\(address)\n\nYour phone must be on the same WiFi as this Mac. "
+            + "To keep it handy, add the page to your Home Screen (Share → Add to Home Screen)."
+        if let qr = qrCode(address) {
+            let view = NSImageView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+            view.image = qr
+            a.accessoryView = view
+        }
+        a.addButton(withTitle: "Done")
+        a.addButton(withTitle: "Copy Address")
+        if a.runModal() == .alertSecondButtonReturn { copy(address) }
+    }
+
+    func qrCode(_ text: String) -> NSImage? {
+        guard let f = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        f.setValue(Data(text.utf8), forKey: "inputMessage")
+        f.setValue("M", forKey: "inputCorrectionLevel")
+        guard let out = f.outputImage else { return nil }
+        // Scale up with hard edges, on a white border so phones read it in dark mode too.
+        let scaled = out.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
+        let rep = NSCIImageRep(ciImage: scaled)
+        let side: CGFloat = 200, pad: CGFloat = 12
+        let img = NSImage(size: NSSize(width: side, height: side))
+        img.lockFocus()
+        NSColor.white.setFill()
+        NSRect(x: 0, y: 0, width: side, height: side).fill()
+        NSGraphicsContext.current?.imageInterpolation = .none
+        rep.draw(in: NSRect(x: pad, y: pad, width: side - 2 * pad, height: side - 2 * pad))
+        img.unlockFocus()
+        return img
+    }
+
     func editConfig() {
         let textEdit = URL(fileURLWithPath: "/System/Applications/TextEdit.app")
         NSWorkspace.shared.open([Paths.config], withApplicationAt: textEdit, configuration: NSWorkspace.OpenConfiguration())
@@ -331,7 +372,7 @@ final class Model: ObservableObject {
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationVersion: "\(appVersion) (monitor \(monitorVersion))",
             .credits: NSAttributedString(string: "Watches your guiding and tells you when it goes wrong. "
-                                         + "Read-only: it never sends anything to your rigs.\n\nSettings and logs: \(Paths.data.path)"),
+                                         + "It never sends commands to your rigs.\n\nSettings and logs: \(Paths.data.path)"),
         ])
     }
 
