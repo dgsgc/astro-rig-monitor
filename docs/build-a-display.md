@@ -74,7 +74,7 @@ The monitor's web server offers two read-only feeds:
 Each `/events` message is one JSON object on a `data:` line, with `t` saying what it is:
 
 ```text
-data: {"t":"hello","version":"0.1.0","rigs":[{"id":"refractor","name":"Refractor"}]}
+data: {"t":"hello","version":"0.2.0","rigs":[{"id":"refractor","name":"Refractor"}]}
 data: {"t":"heartbeat","d":{"v":1,"ts":1794340920,"uptime":8123,...}}
 data: {"t":"state","rig":"refractor","d":{"v":1,"ts":1794340920,"level":"ok",...}}
 data: {"t":"trend","rig":"refractor","d":{...}}

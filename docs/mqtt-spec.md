@@ -38,7 +38,7 @@ In this spec, *bridge* means the monitor (the program that reads the rigs and pu
 ### `arm/bridge/<bridge>/heartbeat`
 
 ```json
-{"v": 1, "ts": 1794340920, "uptime": 8123, "version": "0.1.0", "rigs": ["refractor", "widefield", "observatory"]}
+{"v": 1, "ts": 1794340920, "uptime": 8123, "version": "0.2.0", "rigs": ["refractor", "widefield", "observatory"]}
 ```
 
 `ts` also lets a display without NTP work out the clock offset to the bridge.
@@ -165,7 +165,7 @@ The rig's all-sky camera image, for a quick "is it cloud?" check. Only for rigs 
 ### `arm/display/<display>/info`
 
 ```json
-{"v": 1, "power": "battery", "battery_pct": 78, "supply_v": 3.92, "rssi": -61, "firmware": "0.1.0"}
+{"v": 1, "power": "battery", "battery_pct": 78, "supply_v": 3.92, "rssi": -61, "firmware": "0.3.1"}
 ```
 
 `power` is `battery` (a LiPo on the battery input, `battery_pct` given), `usb` (a 5 V supply such as a USB power bank, whose charge level the board can't see), or `unknown`.

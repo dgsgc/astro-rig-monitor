@@ -106,6 +106,7 @@ The figure on the web page is meant to match what your ASIAIR or NINA shows; see
 - [Build your own display](docs/build-a-display.md): kiosk screens, your own web page, a desktop window, ESP32 over MQTT, Home Assistant.
 - [MQTT message spec](docs/mqtt-spec.md): every message and field, for displays and integrations.
 - [Development](docs/development.md): tests, a fake rig for testing without a telescope, replaying a logged night.
+- [Changes](CHANGELOG.md): what's new in each version, and how to upgrade.
 
 ## Licence
 
