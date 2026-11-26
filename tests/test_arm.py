@@ -996,6 +996,53 @@ class NightReports(unittest.TestCase):
         import shutil
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def test_finished_nights_are_archived_once(self):
+        import gzip
+        from datetime import datetime
+        from arm.morning import MorningReport
+        self.record_night()                                   # night of 12 Nov
+        self.record_night(evening=datetime(2026, 11, 13, 20, 0))
+        src = os.path.join(self.nights, "2026-11-12", "102ed.jsonl")
+        arch = os.path.join(self.tmp, "archive")
+        at = lambda *d: (lambda: datetime(*d).timestamp())
+        mr = MorningReport([], self.nights, self.reports, archive_dir=arch, clock=at(2026, 11, 13, 12, 0))
+        self.assertEqual(mr.archive(), [])                    # 12 Nov's night is still being recorded until noon
+        mr.clock = at(2026, 11, 13, 12, 31)
+        self.assertEqual(mr.archive(), ["2026-11-12"])
+        with gzip.open(os.path.join(arch, "2026-11-12", "102ed.jsonl.gz"), "rb") as f, open(src, "rb") as g:
+            self.assertEqual(f.read(), g.read())
+        self.assertEqual(mr.archive(), [])                    # once only
+        mr.clock = at(2026, 11, 20, 9, 0)
+        self.assertEqual(mr.archive(), ["2026-11-13"])
+        self.assertEqual(MorningReport([], self.nights, self.reports).archive(), [])   # off without archive_dir
+
+    def test_tracker_night_in_the_report(self):
+        from datetime import datetime
+        from arm.recorder import NightRecorder
+        from arm.report import build
+        start = datetime(2026, 11, 12, 21, 0).timestamp()
+        rec = NightRecorder(self.nights)
+        line = lambda t, **k: rec.tracker("sa", k, t)
+        line(start - 60, state="Idle", busy=False, frame=0, total=20, camera={"batterylevel": "100%"})
+        for n in range(1, 21):
+            stars = 40 if 8 <= n <= 13 else 150                       # cloud through frames 8-13
+            base = {"baseline": 40.0, "baseline_stars": 150, "change_pct": 0, "refocused": 0,
+                    "last": {"arcsec": 40.0 + n * 0.1, "stars": stars, "file": f"IMG_{n:04d}.JPG", "usable": stars > 50}}
+            line(start + n * 60, state="Exposing", busy=True, frame=n, total=20, focus=base, camera={"batterylevel": "100%"})
+        line(start + 21 * 60, state="Done", busy=False, frame=20, total=20, focus=base, camera={"batterylevel": "100%"})
+        rec.close()
+        s = RigSettings(id="sa", name="Tracker", dialect="tracker", host="x")
+        path = os.path.join(self.nights, "2026-11-12", "sa.jsonl")
+        html, results = build([(s, path)])
+        a = results[0]
+        self.assertEqual(len(a["runs"]), 1)
+        self.assertEqual((a["runs"][0]["frames"], a["runs"][0]["how"]), (20, "Done"))
+        self.assertEqual([w[2] for w in a["warns"]], ["cloud"])
+        self.assertEqual(len(a["frames"]), 20)
+        self.assertEqual(a["stars_min"], 40)
+        self.assertIn("Cloud? few stars", html)
+        self.assertIn("Run finished after 20 frames", html)
+
     def record_night(self, rig_id="102ed", evening=None):
         """A synthetic night through the recorder: 20:00 onwards on `evening`."""
         from datetime import datetime

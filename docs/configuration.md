@@ -7,7 +7,7 @@ Everything lives in `config.toml`. `python -m arm setup` writes one for you; [`c
 | Section | Turns on | Notes |
 |---|---|---|
 | `[web]` | The web page | `port` (8080), `host` ("0.0.0.0" = whole home network, "127.0.0.1" = this computer only), `allow_origin` (off; `"*"` lets your own page elsewhere read the data, see [build-a-display.md](build-a-display.md#2-your-own-web-page)) |
-| `[report]` | Night recording and the morning report | `at` ("08:00", local time), `keep_days` (30), `nights_dir`, `reports_dir` |
+| `[report]` | Night recording and the morning report | `at` ("08:00", local time), `keep_days` (30), `nights_dir`, `reports_dir`, `archive_dir` (off; see [Night reports](#night-reports)) |
 | `[notify]` | Phone / chat alerts | See [Notifications](#notifications) |
 | `[mqtt]` | Publishing to an MQTT broker | `host`, `port`, `username`, `password`, `tls`, `ca_file`, `prefix` ("arm": every topic starts with it). See [mqtt-spec.md](mqtt-spec.md) |
 | `[defaults]` | Settings shared by every rig | Any rig setting below |
@@ -92,7 +92,7 @@ A camera on a star tracker with no guiding, run by a small controller that takes
 | `battery_warn`, `battery_alert` | 20, 10 | Camera battery (%) → WARN / ALERT |
 | `persist_s`, `offline_grace_s`, `lat`, `lon`, `sky_image_url` | as above | Work the same as for guided rigs |
 
-It alerts when the run stops with an error, when the controller can't be reached while a run is going, and on a low camera battery; it warns on cloud, focus drift, and a card with fewer shots left than frames left in the run. A run starting arms the rig; the run finishing (or being stopped) disarms it. Trackers are recorded with the other rigs but aren't in the night report yet.
+It alerts when the run stops with an error, when the controller can't be reached while a run is going, and on a low camera battery; it warns on cloud, focus drift, and a card with fewer shots left than frames left in the run. A run starting arms the rig; the run finishing (or being stopped) disarms it. The night report gives each tracker its own section: time imaging, frames taken, star size from the start to the end of each run, stars found, time lost to cloud, refocuses, and a chart of star size and stars found per frame.
 
 The status page is JSON. The fields it uses are listed at the top of [`arm/tracker.py`](../arm/tracker.py): `state` (e.g. "Exposing", "Dithering", "Done", "Error"), `frame` and `total`, `remaining_s`, `camera` (`batterylevel`, `availableshots`), and `frame_focus` with each measured frame's star size (`history`) and star count (`counts`) and the run's starting `baseline` and `baseline_stars`. Any controller that serves these can be watched.
 
@@ -157,7 +157,7 @@ ntfy_url = "https://ntfy.sh/arm-a-long-random-name"
 
 ## Night reports
 
-With `[report]`, every rig's guiding stream is recorded each night (`nights/<evening date>/<rig>.jsonl`, about 5 MB per rig per night), and after `at` the night is replayed through the same logic and written as a report page (`reports/guiding-night-<date>.html`), linked from the web page under *Night reports*. Both are deleted after `keep_days`.
+With `[report]`, every rig's guiding stream is recorded each night (`nights/<evening date>/<rig>.jsonl`, about 5 MB per rig per night), and after `at` the night is replayed through the same logic and written as a report page (`reports/guiding-night-<date>.html`), linked from the web page under *Night reports*. Both are deleted after `keep_days`. To keep the recordings for longer (to compare months of guiding, say), set `archive_dir` to a folder that's backed up: after each night ends (12:30 the next day) its recordings are copied there gzipped, about a tenth of the size, and never deleted. Unzip one with `gunzip` to replay it or build a report from it.
 
 The report shows, per rig: headline figures, the night as a chart (RMS each minute against your levels, pauses, alerts, dithers, star-lost events and single-frame jumps), a list of what happened, and an hour-by-hour table.
 

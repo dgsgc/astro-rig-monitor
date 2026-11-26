@@ -6,8 +6,10 @@ guiding gets an empty marker, so nothing is retried. Runs in its own thread so b
 report can never hold up alerting.
 """
 
+import gzip
 import logging
 import os
+import shutil
 import re
 import threading
 import time
@@ -43,7 +45,7 @@ def night_label(night: str) -> str:
 class MorningReport(threading.Thread):
     def __init__(self, rigs: List[RigSettings], nights_dir: str, reports_dir: str, at: str = "08:00",
                  keep_days: int = 30, stop: Optional[threading.Event] = None,
-                 clock: Callable[[], float] = time.time):
+                 clock: Callable[[], float] = time.time, archive_dir: str = ""):
         super().__init__(name="morning-report", daemon=True)
         self.rigs = rigs
         self.nights_dir, self.reports_dir = nights_dir, reports_dir
@@ -52,6 +54,7 @@ class MorningReport(threading.Thread):
         self.stop_event = stop or threading.Event()
         self.clock = clock
         self.tries = {}            # night -> (count, last attempt)
+        self.archive_dir = archive_dir
         os.makedirs(self.reports_dir, exist_ok=True)
 
     def due(self) -> Optional[str]:
@@ -92,7 +95,9 @@ class MorningReport(threading.Thread):
                                              '<header class="top"><a class="backlink" href="../">‹ Astro Rig Monitor</a>', 1))
         os.replace(base + ".html.part", base + ".html")
         log.info("morning report for %s: %s", night, ", ".join(
-            f"{a['s'].name or a['s'].id} {a['median']:.2f}\" ({len(a['alerts'])} alerts)" for a in results))
+            f"{a['s'].name or a['s'].id} "
+            + (f"{a['median']:.2f}\"" if a.get("median") is not None else f"{len(a.get('runs', []))} runs")
+            + f" ({len(a['alerts'])} alerts)" for a in results))
         self._prune()
         return "html"
 
@@ -106,10 +111,51 @@ class MorningReport(threading.Thread):
                 except OSError:
                     pass
 
+    def archive(self) -> List[str]:
+        """Copy each finished night's recordings to archive_dir as <night>/<rig>.jsonl.gz, once.
+
+        A night is finished half an hour after the recorder moves on to the next one (at noon).
+        The archive is never pruned: it's the copy to keep (a backed-up folder, say). Returns the
+        nights archived, for the log and tests."""
+        if not self.archive_dir:
+            return []
+        done = []
+        cutoff = datetime.fromtimestamp(self.clock()) - timedelta(days=1, hours=12, minutes=30)
+        try:
+            nights = sorted(os.listdir(self.nights_dir))
+        except OSError:
+            return []
+        for night in nights:
+            try:
+                if datetime.strptime(night, "%Y-%m-%d") > cutoff:
+                    continue
+            except ValueError:
+                continue
+            dest = os.path.join(self.archive_dir, night)
+            if os.path.exists(os.path.join(dest, ".done")):
+                continue
+            os.makedirs(dest, exist_ok=True)
+            src = os.path.join(self.nights_dir, night)
+            for name in sorted(os.listdir(src)):
+                if not name.endswith(".jsonl"):
+                    continue
+                part = os.path.join(dest, name + ".gz.part")
+                with open(os.path.join(src, name), "rb") as fin, gzip.open(part, "wb") as fout:
+                    shutil.copyfileobj(fin, fout)
+                os.replace(part, os.path.join(dest, name + ".gz"))
+            open(os.path.join(dest, ".done"), "w").close()
+            log.info("night recorder: archived %s to %s", night, self.archive_dir)
+            done.append(night)
+        return done
+
     def run(self):
         while not self.stop_event.is_set():
             try:
                 self.run_once()
             except Exception:
                 log.exception("morning report failed")
+            try:
+                self.archive()
+            except Exception:
+                log.exception("archiving the night recordings failed")
             self.stop_event.wait(60)

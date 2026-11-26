@@ -38,6 +38,7 @@ class ReportSettings:
     nights_dir: str = "nights"         # the night recorder's files (relative to where the bridge runs)
     reports_dir: str = "reports"
     keep_days: int = 30                # recordings and reports older than this are deleted
+    archive_dir: str = ""              # if set: each finished night is also copied here, gzipped, and kept
 
 
 @dataclass

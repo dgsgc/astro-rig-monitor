@@ -19,6 +19,7 @@ port = 8080
 [report]
 at = "08:00"                  # local time to build last night's report
 keep_days = 30                # recordings and reports older than this are deleted
+# archive_dir = "/path/to/backed-up/folder"   # also keep every night here, gzipped, never deleted
 
 # Phone / chat alerts. ntfy: install the free ntfy app and subscribe to your topic name.
 # Anyone who knows the topic name can read it, so make it long and random (setup does this).

@@ -64,8 +64,8 @@ def main(argv=None):
     rep = cfg.report
     if rep.enabled:
         recorder = NightRecorder(rep.nights_dir, rep.keep_days)
-        # Trackers are recorded, but the report only covers guided rigs for now.
-        MorningReport([r for r in cfg.rigs if r.dialect != "tracker"], rep.nights_dir, rep.reports_dir, rep.at, rep.keep_days, stop).start()
+        MorningReport(cfg.rigs, rep.nights_dir, rep.reports_dir, rep.at, rep.keep_days, stop,
+                      archive_dir=rep.archive_dir).start()
         log.info("night reports: recording to %s, report each morning after %s", rep.nights_dir, rep.at)
     web = hub = None
     if cfg.web.enabled:

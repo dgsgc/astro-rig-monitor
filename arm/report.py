@@ -650,12 +650,21 @@ def page(results, title_date):
     T1 = max(a["t_end"] for a in results)
     T0 = (datetime.fromtimestamp(T0).replace(minute=0, second=0, microsecond=0)).timestamp()
     T1 = (datetime.fromtimestamp(T1).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)).timestamp()
+    from .tracker_report import tracker_section
+
+    def figure(a):
+        if a.get("kind") == "tracker":
+            return f'{sum(r["frames"] or 0 for r in a["runs"])} frames'
+        return f'{a["median"]:.2f}″' if a["median"] is not None else None
+
     pills = "".join(
         f'<a href="#{html.escape(a["s"].id)}"><span class="pip {"alert" if a["alerts"] else "warn" if a["warns"] else ""}"></span>'
-        f'{html.escape(a["s"].name or a["s"].id)} <b>{a["median"]:.2f}″</b></a>'
-        for a in results if a["median"] is not None)
-    rigs = "".join(rig_section(a, T0, T1) for a in results)
-    total_frames = sum(len(a["frames"]) for a in results)
+        f'{html.escape(a["s"].name or a["s"].id)} <b>{figure(a)}</b></a>'
+        for a in results if figure(a) is not None)
+    rigs = "".join(tracker_section(a, T0, T1) if a.get("kind") == "tracker" else rig_section(a, T0, T1) for a in results)
+    guided = [a for a in results if a.get("kind") != "tracker"]
+    total_frames = sum(len(a["frames"]) for a in guided)
+    what = f"{total_frames:,} guide frames" if guided else "tracker runs"
     return f"""<title>Guiding night {html.escape(title_date)}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -665,7 +674,7 @@ def page(results, title_date):
   <header class="top">
     <div class="eyebrow">Guiding night</div>
     <h1>{html.escape(title_date)}</h1>
-    <p class="sub">{len(results)} rig{"s" if len(results) != 1 else ""}, {total_frames:,} guide frames from {hm(T0)} to {hm(T1)} ({datetime.fromtimestamp(T0).astimezone().tzname()}). Typical total RMS per rig:</p>
+    <p class="sub">{len(results)} rig{"s" if len(results) != 1 else ""}, {what} from {hm(T0)} to {hm(T1)} ({datetime.fromtimestamp(T0).astimezone().tzname()}). {"Typical total RMS per rig" if guided else "Frames taken per rig"}{" (frames taken for trackers)" if guided and len(guided) < len(results) else ""}:</p>
     <nav class="overview" aria-label="Rigs">{pills}</nav>
   </header>
   {rigs}
@@ -688,17 +697,19 @@ def night_title(results) -> str:
 
 
 def build(rigs: List[Tuple[RigSettings, str]], title: Optional[str] = None) -> Tuple[str, list]:
-    """HTML page (a fragment: no <html>/<body>) and the per-rig analysis, for rigs that guided."""
+    """HTML page (a fragment: no <html>/<body>) and the per-rig analysis, for rigs that guided
+    (or, for trackers, ran)."""
+    from .tracker_report import analyse_tracker
     results = []
     for s, path in rigs:
         try:
-            a = analyse(s, path)
+            a = analyse_tracker(s, path) if s.dialect == "tracker" else analyse(s, path)
         except (OSError, ValueError):
             continue
-        if a["frames"]:
+        if a["frames"] or a.get("runs"):
             results.append(a)
     if not results:
-        raise ValueError("no guide frames in any of the recordings")
+        raise ValueError("no guide frames or tracker runs in any of the recordings")
     return page(results, title or night_title(results)), results
 
 
