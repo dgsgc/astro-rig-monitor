@@ -34,7 +34,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Astro Rig Monitor listens to your ASIAIRs and PHD2 on your network to watch the guiding. It never sends anything to them.</string>
+	<string>Astro Rig Monitor reads the guiding from your ASIAIRs and PHD2, and pictures from an all-sky camera, on your network. It never sends commands to them.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT licence</string>
 </dict>
