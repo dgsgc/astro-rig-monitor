@@ -23,6 +23,16 @@ def schtasks(*args: str):
 
 
 def user() -> str:
+    """This account as DOMAIN\\name, asked from Windows itself: USERDOMAIN can be wrong (an SSH
+    session says WORKGROUP), and Task Scheduler can't map a wrong name."""
+    try:
+        import ctypes
+        size = ctypes.c_ulong(256)
+        buf = ctypes.create_unicode_buffer(size.value)
+        if ctypes.windll.secur32.GetUserNameExW(2, buf, ctypes.byref(size)):     # NameSamCompatible
+            return buf.value
+    except Exception:
+        pass
     domain = os.environ.get("USERDOMAIN")
     name = os.environ.get("USERNAME") or getpass.getuser()
     return f"{domain}\\{name}" if domain else name
