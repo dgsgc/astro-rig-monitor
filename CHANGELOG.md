@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+**New**
+- **One-command install for a Raspberry Pi or Linux** (`tools/install.sh`): downloads the newest release, installs it with its own Python environment and a systemd service, and prints the setup page's address. Run it again to update; `--remove` removes it. Tested end to end on x86 and ARM Ubuntu.
+- A monitor set up from another computer keeps `setup_from_lan = true`, and its web page shows the **Add rigs or change settings** link on other computers too.
+
 ## 0.3.0 (26 November 2026)
 
 **New**

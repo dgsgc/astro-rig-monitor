@@ -20,6 +20,7 @@
 | `tools/guide_logger.py` | Records a rig's raw stream to a file (read-only) |
 | `tools/replay.py` | Runs a recording or a scenario through the logic offline, with CSV output |
 | `tools/night_report.py` | Builds a night report by hand |
+| `tools/install.sh` | The one-command Raspberry Pi / Linux installer. `ARM_FROM=<checkout>` installs a checkout instead of the newest release; CI runs it end to end (`.github/scripts/test_install.sh`) |
 | `arm/tracker.py` | Trackers without guiding: reads the controller's status page |
 | `mac/` | The Mac app: menu-bar app and launcher (Swift), `build.sh` (bundles Python), icon tool. See [mac/README.md](../mac/README.md) |
 | `esp32/` | Firmware for the ESP32 desk display (Arduino, LVGL) and its WiFi update script |

@@ -79,11 +79,19 @@ For now, use the [manual install](#manual-install-any-computer) with Python from
 
 ### Raspberry Pi and Linux
 
-For now, use the [manual install](#manual-install-any-computer). A one-command installer is planned. On a Pi without a screen, set it up from another computer (see below).
+On Raspberry Pi OS (Bookworm or later), Debian 12+ or Ubuntu 24.04+, paste this into a terminal on the Pi, as your normal user:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dgsgc/astro-rig-monitor/main/tools/install.sh | bash
+```
+
+It installs the newest release in `~/astro-rig-monitor` with its own Python environment, runs it as a service that starts at boot, and prints the address of the [setup page](#setting-up-your-rigs) to open from your phone or computer. It asks for your password to add the service. Run the same command again to update; your settings stay. To remove it, add ` -s -- --remove` after `bash`. The log is `~/astro-rig-monitor/arm.log`.
+
+A Pi set up from another computer keeps allowing that (`setup_from_lan = true` in `config.toml`), so **Add rigs or change settings** works from your phone too.
 
 ### Manual install (any computer)
 
-For Windows, a Raspberry Pi or Linux, or a Mac without the app. Needs Python 3.11 or later and git.
+For Windows, or any computer where you'd rather do it by hand. Needs Python 3.11 or later and git.
 
 ```bash
 git clone https://github.com/dgsgc/astro-rig-monitor.git
@@ -99,7 +107,7 @@ On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`. The first
 
 | System | Install / update | Remove |
 |---|---|---|
-| Raspberry Pi, Linux | `tools/install_service_linux.sh` | `tools/install_service_linux.sh --remove` |
+| Raspberry Pi, Linux (or use the one-command install above) | `tools/install_service_linux.sh` | `tools/install_service_linux.sh --remove` |
 | Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File tools\install_service_windows.ps1` | same with `-Remove` |
 | macOS (if not using the app) | `tools/install_service_mac.sh` | `tools/install_service_mac.sh --remove` |
 
