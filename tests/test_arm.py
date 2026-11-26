@@ -1,6 +1,7 @@
 """Tests for the bridge logic. Run:  python -m unittest discover -s tests"""
 
 import json
+import time
 import math
 import os
 import sys
@@ -1298,8 +1299,8 @@ class Setup(unittest.TestCase):
         f = analyse_lines(line for _, line in s.lines)
         self.assertEqual((f["dialect"], f["units"], f["guide_scale"]), ("phd2", "pixels", None))
 
-    def test_listen_reads_only(self):
-        """listen() against a local server: gets the lines and never sends a byte."""
+    def _listen_to(self, sim, reply=None):
+        """listen() against a local server sending sim's lines; returns (found, bytes received)."""
         import socket
         import threading
         from arm.setup import listen
@@ -1310,13 +1311,18 @@ class Setup(unittest.TestCase):
 
         def serve():
             c, _ = srv.accept()
-            s = Sim(dialect="phd2").version().guide(40, 0.8)
-            c.sendall("".join(line + "\r\n" for _, line in s.lines).encode())
+            lines = [line for _, line in sim.lines]
+            c.sendall((lines[0] + "\r\n").encode())               # Version first, as PHD2 does
             c.settimeout(1)
             try:
-                received.append(c.recv(100))
+                got = c.recv(200)
             except socket.timeout:
-                received.append(b"")
+                got = b""
+            received.append(got)
+            if got and reply is not None:
+                c.sendall((json.dumps(dict(reply, id=json.loads(got)["id"])) + "\r\n").encode())
+            c.sendall("".join(line + "\r\n" for line in lines[1:]).encode())
+            time.sleep(0.5)
             c.close()
 
         th = threading.Thread(target=serve, daemon=True)
@@ -1324,8 +1330,27 @@ class Setup(unittest.TestCase):
         f = listen("127.0.0.1", srv.getsockname()[1], seconds=5, frames=12, say=lambda *_: None)
         th.join(5)
         srv.close()
-        self.assertEqual(f["dialect"], "phd2")
+        return f, received
+
+    def test_listen_asks_phd2_its_scale_once(self):
+        f, received = self._listen_to(Sim(dialect="phd2").version().guide(40, 0.8),
+                                      {"jsonrpc": "2.0", "result": 2.4917})
+        self.assertEqual(len(received), 1)
+        self.assertEqual(json.loads(received[0]), {"method": "get_pixel_scale", "id": 4417})
+        self.assertEqual((f["dialect"], f["units"], f["guide_scale"], f["scale_from"]),
+                         ("phd2", "pixels", 2.49, "phd2"))
         self.assertGreaterEqual(f["frames"], 12)
+
+    def test_listen_ignores_a_phd2_with_no_scale(self):
+        f, _ = self._listen_to(Sim(dialect="phd2").version().guide(40, 0.8),
+                               {"jsonrpc": "2.0", "result": None})
+        self.assertEqual((f["units"], f["guide_scale"]), ("pixels", None))
+
+    def test_listen_sends_an_asiair_nothing(self):
+        asiair = Sim(dialect="asiair").guide(40, 0.8)
+        asiair.lines.insert(0, (0, '{"Event":"Version","name":"ASI AIR guider","svr_ver_int":12}'))
+        f, received = self._listen_to(asiair)
+        self.assertEqual(f["dialect"], "asiair")
         self.assertEqual(received, [b""])
 
     def test_reader_two_links_no_dupes_no_sends(self):

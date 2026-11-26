@@ -275,12 +275,14 @@ async function listen(el, q, show) {
       q("units").value = f.units;
       text += f.units === "arcsec"
         ? ". It reports arcsec (guide scale about " + f.guide_scale + "\"/px), so nothing more is needed."
-        : ". It reports pixels: enter the guide scale below.";
+        : f.scale_from === "phd2"
+          ? ". It reports pixels; PHD2 gives its guide scale as " + f.guide_scale + "\"/px, filled in below."
+          : ". It reports pixels: enter the guide scale below (PHD2 didn't say what it is; a camera may not be connected).";
     } else if (f.dialect === "asiair") {
       q("units").value = "arcsec";
       text += ". Couldn't tell arcsec from pixels without guiding frames; most ASIAIRs report arcsec.";
     }
-    if (f.guide_scale && !q("scale").value) q("scale").value = f.guide_scale;
+    if (f.guide_scale && (f.scale_from === "phd2" || !q("scale").value)) q("scale").value = f.guide_scale;
     out.className = "found good";
     out.textContent = text;
     show();

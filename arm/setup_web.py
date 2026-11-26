@@ -11,7 +11,8 @@ Safety:
   name this computer too, so a web page can't reach it through a DNS trick.
 - Every change (POST) needs the page's own random token in a header. A page from another site
   can't read the token or send that header, so it can't change the settings.
-- Listening to a rig uses the same read-only probe as the wizard: nothing is sent to the rig.
+- Listening to a rig uses the same probe as the wizard: it sends an ASIAIR nothing, and PHD2 only
+  the read-only question get_pixel_scale, once.
 - Starting again keeps the old file as config.toml.bak-<date>; adding a rig keeps every line of
   the existing file and appends to it.
 """

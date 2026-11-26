@@ -7,7 +7,11 @@ Lets the bridge (and the ESP32) be tested end to end without touching a real rig
 
 Then point a rig in config.toml at host = "127.0.0.1", port = 4401.
 Scenarios: good, warn, alert, starlost, stopped, mixed (loops through several).
+Like PHD2, it answers get_pixel_scale (with --pixel-scale), the one question the setup's
+listen asks.
 """
+
+import json
 
 import argparse
 import os
@@ -41,7 +45,36 @@ def scenario(name: str, exposure: float, dialect: str) -> Sim:
     return s
 
 
+def answer_questions(conn: socket.socket, args):
+    """Reply to JSON-RPC questions as PHD2 would; only get_pixel_scale has an answer."""
+    buf = b""
+    try:
+        while True:
+            chunk = conn.recv(4096)
+            if not chunk:
+                return
+            buf += chunk
+            *lines, buf = buf.split(b"\n")
+            for line in lines:
+                try:
+                    q = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(q, dict):
+                    continue
+                print(f"asked {q.get('method')}")
+                if q.get("method") == "get_pixel_scale":
+                    reply = {"jsonrpc": "2.0", "result": args.pixel_scale, "id": q.get("id")}
+                else:
+                    reply = {"jsonrpc": "2.0", "error": {"code": 1, "message": "not in the fake rig"},
+                             "id": q.get("id")}
+                conn.sendall((json.dumps(reply) + "\r\n").encode())
+    except OSError:
+        pass
+
+
 def serve_client(conn: socket.socket, args):
+    threading.Thread(target=answer_questions, args=(conn, args), daemon=True).start()
     try:
         while True:
             lines = scenario(args.scenario, args.exposure, args.dialect).lines
@@ -65,6 +98,7 @@ def main():
     ap.add_argument("--scenario", default="mixed")
     ap.add_argument("--exposure", type=float, default=2.0)
     ap.add_argument("--dialect", choices=["asiair", "phd2"], default="asiair")
+    ap.add_argument("--pixel-scale", type=float, default=1.5, help="guide scale (\"/px) to report")
     ap.add_argument("--speed", type=float, default=1.0, help="time multiplier, e.g. 10 for 10x")
     ap.add_argument("--loop", action="store_true", help="repeat the scenario forever")
     args = ap.parse_args()

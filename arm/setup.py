@@ -1,11 +1,13 @@
 """`python -m arm setup`: write config.toml by asking a few questions.
 
-For each rig it listens to port 4400 for up to a minute (read-only: it never sends anything) to
-find out what the rig is:
+For each rig it listens to port 4400 for up to a minute to find out what the rig is:
 - the Version event says ASIAIR ("ASI AIR guider") or PHD2 (PHDVersion);
 - while guiding, each GuideStep has the star's offset in camera pixels (dx, dy) and along RA/Dec
   (RADistanceRaw, DECDistanceRaw). PHD2 gives both in pixels, so their sizes match. ASIAIR gives
   RA/Dec in arcsec, so the ratio between them is the guide scale (arcsec per pixel).
+- PHD2 can't be measured that way, so for PHD2 (and only PHD2) it asks once for the guide scale
+  (`get_pixel_scale`, a read-only question that changes nothing). It sends nothing else, and
+  sends nothing at all to an ASIAIR. The running monitor never sends anything.
 """
 
 import argparse
@@ -21,6 +23,8 @@ from typing import Callable, Iterable, List, Optional
 
 LISTEN_S = 60
 FRAMES_WANTED = 12
+SCALE_ID = 4417            # our id on the one question we ask PHD2, to pick out its reply
+SCALE_QUESTION = json.dumps({"method": "get_pixel_scale", "id": SCALE_ID}) + "\r\n"
 
 
 # --- finding out what a rig is ----------------------------------------------------------------
@@ -30,6 +34,7 @@ def analyse_lines(lines: Iterable[str]) -> dict:
     found = {"dialect": None, "version": None, "frames": 0, "ratio": None, "units": None,
              "guide_scale": None, "guiding": False}
     ratios: List[float] = []
+    asked_scale = None
     for line in lines:
         try:
             ev = json.loads(line)
@@ -38,6 +43,11 @@ def analyse_lines(lines: Iterable[str]) -> dict:
         if not isinstance(ev, dict):
             continue
         name = ev.get("Event")
+        if name is None and ev.get("id") == SCALE_ID:      # PHD2's answer to get_pixel_scale
+            r = ev.get("result")
+            if isinstance(r, (int, float)) and not isinstance(r, bool) and 0 < r < 100:
+                asked_scale = float(r)
+            continue
         if name == "Version":
             if "PHDVersion" in ev:
                 found["dialect"], found["version"] = "phd2", f"PHD2 {ev['PHDVersion']}"
@@ -65,13 +75,17 @@ def analyse_lines(lines: Iterable[str]) -> dict:
         # an ASIAIR with a ratio near 1 could be pixels, or arcsec at about 1"/px: the user decides
     elif found["dialect"] == "phd2":
         found["units"] = "pixels"
+    if asked_scale and found["units"] == "pixels":
+        found["guide_scale"], found["scale_from"] = round(asked_scale, 2), "phd2"
     return found
 
 
 def listen(host: str, port: int, seconds: float = LISTEN_S, frames: int = FRAMES_WANTED,
            say: Callable[[str], None] = print) -> dict:
-    """Read the rig's event stream for a while. Read-only: nothing is ever sent to the rig."""
+    """Read the rig's event stream for a while. The one thing ever sent is, to PHD2 only, the
+    read-only question get_pixel_scale, once."""
     lines: List[str] = []
+    asked, asked_at = False, 0.0
     try:
         sock = socket.create_connection((host, port), timeout=10)
     except OSError as e:
@@ -85,13 +99,21 @@ def listen(host: str, port: int, seconds: float = LISTEN_S, frames: int = FRAMES
             try:
                 chunk = sock.recv(65536)
             except socket.timeout:
-                continue
-            if not chunk:
+                chunk = None
+            if chunk == b"":
                 break
-            buf += chunk
-            *done, buf = buf.split(b"\n")
-            lines += [d.decode("utf-8", "replace").strip() for d in done if d.strip()]
-            if sum('"GuideStep"' in x for x in lines) >= frames:
+            if chunk:
+                buf += chunk
+                *done, buf = buf.split(b"\n")
+                lines += [d.decode("utf-8", "replace").strip() for d in done if d.strip()]
+            if not asked and any('"PHDVersion"' in x for x in lines):
+                asked, asked_at = True, time.time()
+                try:
+                    sock.sendall(SCALE_QUESTION.encode())
+                except OSError:
+                    pass
+            waiting = asked and time.time() - asked_at < 5 and not any(f'"id":{SCALE_ID}' in x.replace(" ", "") for x in lines)
+            if sum('"GuideStep"' in x for x in lines) >= frames and not waiting:
                 break
     except OSError as e:
         if not lines:
@@ -180,7 +202,10 @@ def ask_rig(a: Asker, taken: List[str], probe=listen) -> dict:
     else:
         units = units or "pixels"
     rig["units"] = units
-    if units == "pixels":
+    if units == "pixels" and found.get("scale_from") == "phd2":
+        a.say(f"  PHD2 gives its guide scale as {scale}\"/px.")
+        rig["guide_scale"] = a.number("Guide scale (\"/px)", scale)
+    elif units == "pixels":
         a.say("  Guide scale: arcsec per guide-camera pixel, binning included. PHD2 shows it in"
               " Guiding Assistant / the log; NINA in the Guider panel.")
         rig["guide_scale"] = a.number("Guide scale (\"/px)", scale or None)
