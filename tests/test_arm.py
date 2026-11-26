@@ -257,6 +257,48 @@ class Levels(unittest.TestCase):
         run(m, s.dither().guide(10, 0.5))
         self.assertEqual(m.level, "ok")
 
+    # These feed each step's lines once (run() replays a Sim's whole timeline), so counts are exact.
+    @staticmethod
+    def _step(m, s):
+        run(m, s)
+        s.lines.clear()
+
+    def _three_failed_dithers(self):
+        m, s = new(dialect="phd2")
+        self._step(m, s.guide(40, 0.5))
+        for _ in range(3):
+            self._step(m, s.dither(failed=True).guide(10, 0.5))
+        self.assertEqual((m.reason, m.settle_fails), ("settle_failed", 3))
+        return m, s
+
+    def test_nina_settle_retry_counts_once_per_dither(self):
+        # NINA settles again after a timed-out settle, so 2 large dithers once
+        # gave 4 failures in a row and an ALERT.
+        m, s = new(dialect="phd2")
+        self._step(m, s.guide(40, 0.5))
+        for _ in range(2):
+            s.dither(failed=True)
+            s._emit("SettleBegin")
+            s._emit("SettleDone", Status=1, Error="timed-out waiting for guider to settle")
+            self._step(m, s.guide(10, 0.5))
+        self.assertEqual((m.settle_fails, m.settle_fail_streak), (2, 2))
+        self.assertEqual(m.level, "ok")
+
+    def test_settle_alert_clears_after_good_guiding(self):
+        m, s = self._three_failed_dithers()
+        self._step(m, s.guide(60, 0.5))
+        self.assertEqual(m.reason, "settle_failed")      # not yet 2 minutes
+        self._step(m, s.guide(90, 0.5))
+        self.assertEqual(m.level, "ok")
+        self.assertEqual(m.settle_fails, 3)              # the night's count is kept
+
+    def test_settle_alert_stays_while_guiding_is_poor(self):
+        m, s = self._three_failed_dithers()
+        self._step(m, s.guide(200, 1.3))
+        self.assertEqual(m.level, "alert")
+        self.assertIn(m.reason, ("settle_failed", "rms_high"))
+        self.assertEqual(m.settle_fail_streak, 3)
+
     def test_new_guiding_start_forgets_old_settle_failures(self):
         # 13 Nov 2026, 102ed: 122 failed settles while clouds came in, then guiding restarted at
         # 05:34 and alerted "Settle failing" straight away from the old count.

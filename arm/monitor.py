@@ -88,7 +88,8 @@ class RigSettings:
     sky_image_url: Optional[str] = None   # all-sky camera's latest image (see bridge/sky.py)
     sky_every_s: float = 120.0            # how often to fetch it; also fetched at once on ALERT
     sky_stretch: bool = True              # stretch contrast so cloud shows on a dark night image
-    settle_fail_limit: int = 3       # consecutive failed settles -> ALERT
+    settle_fail_limit: int = 3       # dithers in a row whose settle failed -> ALERT
+    settle_clear_s: float = 120.0    # guiding within levels this long after a failed settle clears that ALERT
     settle_max_s: float = 180.0      # stop treating frames as settling after this long
     screen_method: str = "stdev"     # on-screen figure, meant to match ASIAIR
     screen_window: int = 100         # frames, dithers included
@@ -153,6 +154,9 @@ class RigMonitor:
         self.dithers = 0
         self.settle_fails = 0
         self.settle_fail_streak = 0
+        self._settle_open = False          # a dither/settle whose result is still to come
+        self._settle_open_failed = False   # ...and it has already failed once (NINA retries the settle)
+        self._settle_ok_since: Optional[float] = None   # guiding within levels since, after a failure
         self.last_good_total: Optional[float] = None
 
         self.armed = False
@@ -270,6 +274,7 @@ class RigMonitor:
                 self.armed = False
                 self.acked = False
                 self.ended = "dawn"
+            self._settle_recovery(now)
             self._evaluate(now)
 
     # ----------------------------------------------------------------- events
@@ -289,6 +294,8 @@ class RigMonitor:
         self.guiding_since = now
         self.star_lost_since = None
         self.settle_fail_streak = 0     # a fresh start: earlier failures (e.g. last night's end) don't count
+        self._settle_open = self._settle_open_failed = False
+        self._settle_ok_since = None
         self.armed = True
         self.acked = False
         self.ended = None
@@ -362,8 +369,11 @@ class RigMonitor:
             self.dithers += 1
             self.dithering = self.settling = True
             self.settling_since = now
+            self._settle_open, self._settle_open_failed = True, False
         elif event == "SettleBegin":
             self.settling, self.settling_since = True, now
+            if not self._settle_open:            # a settle with no dither (e.g. after a slew)
+                self._settle_open, self._settle_open_failed = True, False
         elif event == "Settling":
             if not self.settling:
                 # The dither's start was missed (the bridge joined mid-dither, e.g. after a
@@ -375,10 +385,16 @@ class RigMonitor:
         elif event == "SettleDone":
             self.settling = self.dithering = False
             if p.get("Status", 0) != 0:
-                self.settle_fails += 1
-                self.settle_fail_streak += 1
+                # NINA settles again after a timed-out settle; that retry is the same dither,
+                # so a dither counts as one failure however many of its settles time out.
+                if not self._settle_open_failed:
+                    self.settle_fails += 1
+                    self.settle_fail_streak += 1
+                self._settle_open, self._settle_open_failed = True, True
+                self._settle_ok_since = None
             else:
                 self.settle_fail_streak = 0
+                self._settle_open = self._settle_open_failed = False
         elif event == "AppState":
             mapped = APPSTATE_MAP.get(p.get("State"))
             if mapped == "guiding" and self.state in RESTART_FROM:
@@ -559,6 +575,19 @@ class RigMonitor:
         elif now - self._cand_since >= self.s.persist_s:
             self.rms_level = band
             self._cand_dir, self._cand_since = 0, None
+
+    def _settle_recovery(self, now: float):
+        """Clear a settle_failed ALERT once guiding has been within levels for settle_clear_s.
+        Without this it would last until the next dither settles, often 10 minutes away."""
+        if self.settle_fail_streak < self.s.settle_fail_limit:
+            return
+        if self.state != "guiding" or self.settling or self.rms_level != "ok":
+            self._settle_ok_since = None
+        elif self._settle_ok_since is None:
+            self._settle_ok_since = now
+        elif now - self._settle_ok_since >= self.s.settle_clear_s:
+            self.settle_fail_streak = 0
+            self._settle_ok_since = None
 
     def _conditions(self, now: float):
         s = self.s

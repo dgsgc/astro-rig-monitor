@@ -166,7 +166,7 @@ All are per-rig settings (see [configuration.md](configuration.md)).
 - **`alert_total` leaves out** dithering, settling and known tasks. It starts fresh when guiding restarts, and ignores frames until settling finishes.
 - **Guiding stopped or star lost for > 20 s** → ALERT, unless a known task is running.
 - **A known task running longer than its limit** → ALERT `task_too_long` (`task_limit_s`, default 10 min).
-- **Repeated settle failures** → ALERT `settle_failed` (`settle_fail_limit` in a row, default 3).
+- **Repeated settle failures** → ALERT `settle_failed` (`settle_fail_limit` dithers in a row, default 3; a retried settle counts once). It clears after `settle_clear_s` (default 120 s) of guiding within the levels, or when a settle succeeds.
 - **While armed:** the rig unreachable or silent → ALERT `rig_offline` / `data_stale`.
 
 ## What the display does on its own

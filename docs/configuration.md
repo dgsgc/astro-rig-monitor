@@ -34,7 +34,8 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 | `offline_grace_s` | 30 | Rig unreachable longer than this while armed → ALERT |
 | `frame_timeout_s` | 30 | Guiding but no guide frames for this long → ALERT. Use 60 for NINA |
 | `task_limit_s` | 600 | A known task (calibration, or with `app_port` an autofocus or filter change) running longer than this → ALERT |
-| `settle_fail_limit` | 3 | Failed settles in a row → ALERT |
+| `settle_fail_limit` | 3 | Dithers in a row whose settle failed → ALERT. NINA settles again after a timed-out settle; that retry counts as the same dither |
+| `settle_clear_s` | 120 | Guiding within the levels this long after a failed settle clears that ALERT (otherwise it would last until the next dither settles) |
 | `settle_max_s` | 180 | Stop treating frames as settling after this long |
 | `lat`, `lon` | none | Site position, degrees (north and east positive). See [End of the night](#end-of-the-night) |
 | `dawn_sun_alt` | -18 | Sun altitude that counts as dawn |
