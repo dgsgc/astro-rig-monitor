@@ -23,6 +23,7 @@
 | `tools/install.sh` | The one-command Raspberry Pi / Linux installer. `ARM_FROM=<checkout>` installs a checkout instead of the newest release; CI runs it end to end (`.github/scripts/test_install.sh`) |
 | `arm/tracker.py` | Trackers without guiding: reads the controller's status page |
 | `mac/` | The Mac app: menu-bar app and launcher (Swift), `build.sh` (bundles Python), icon tool. See [mac/README.md](../mac/README.md) |
+| `windows/` | The Windows app: tray icon, launcher and scheduled task (`armwin`, Python), `build.ps1` (bundles Python, builds the Inno Setup installer), `test_install.ps1` (CI). See [windows/README.md](../windows/README.md) |
 | `esp32/` | Firmware for the ESP32 desk display (Arduino, LVGL) and its WiFi update script |
 | `examples/` | Starting points for your own display: a web page and a desktop window (see [build-a-display.md](build-a-display.md)) |
 
