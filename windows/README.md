@@ -8,7 +8,7 @@ It sits in the system tray (by the clock). The monitor runs in the background on
 
 1. Download **Astro-Rig-Monitor-Setup.exe** from the [releases page](https://github.com/dgsgc/astro-rig-monitor/releases) (the `win-v…` release).
 2. Run it. The installer isn't signed with a paid certificate, so Windows may say **"Windows protected your PC"**: click **More info**, then **Run anyway**. It installs for your user only and doesn't need administrator rights.
-3. **Set up:** your browser opens the setup page. Add your rigs (use **Listen to detect its settings** while a rig is guiding), choose your phone alerts, and press **Save and start**.
+3. **Set up:** the setup page opens in a window of its own (an Edge window without tabs; in your usual browser if Edge isn't there). Add your rigs (use **Listen to detect its settings** while a rig is guiding), choose your phone alerts, and press **Save and start**.
 4. **Allow what Windows asks:** when Windows Defender Firewall asks about Python ("pythonw.exe"), allow it on **private networks**, so your phone can open the web page.
 
 Needs 64-bit Windows 10 or 11.
@@ -22,7 +22,7 @@ Right-click the icon (it may be under the **^** arrow by the clock: drag it out 
 | Status | Running and how many rigs, not set up yet, or stopped |
 | Open in Browser on This PC | The live web page |
 | Open on Your Phone… | A page with a QR code to scan with your phone's camera, and the address to type. The phone must be on the same WiFi. |
-| Add Rigs or Change Settings… | The setup page: add rigs, or start again (the old settings are kept as a backup) |
+| Add Rigs or Change Settings… | The setup page, in its own window: add rigs, or start again (the old settings are kept as a backup). After **Save and start** the window shows the monitor's page; close it when you're done. |
 | Send Test Notification | Checks your ntfy or Discord alerts arrive |
 | More → Edit Settings File… | `config.toml` in Notepad, for settings the setup page doesn't cover ([configuration.md](../docs/configuration.md)). Then **Restart Monitor**. |
 | More → Import Settings File… | Use a `config.toml` from an earlier install |

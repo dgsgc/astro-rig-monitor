@@ -69,14 +69,14 @@ Pick the way for the computer that will run it. Every way runs the same monitor,
 
 1. Download **Astro Rig Monitor for Mac** from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases) (the `mac-v…` release): `Astro-Rig-Monitor-Apple-Silicon.zip` for an M1 or later, `Astro-Rig-Monitor-Intel.zip` for an Intel Mac (Apple menu → About This Mac says which).
 2. Unzip it, drag **Astro Rig Monitor** into Applications, and open it the first time with right-click → **Open** (it isn't notarised by Apple).
-3. Your browser opens the setup page ([Setting up your rigs](#setting-up-your-rigs)). Allow what macOS asks: the background item and your local network.
+3. The setup page opens in a window of its own ([Setting up your rigs](#setting-up-your-rigs)). Allow what macOS asks: the background item and your local network.
 
 It lives in the menu bar, starts at login and keeps the Mac awake while it runs. Needs macOS 13 or later. More in [mac/README.md](mac/README.md).
 
 ### Windows: the app
 
 1. Download **Astro-Rig-Monitor-Setup.exe** from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases) (the `win-v…` release) and run it. It isn't signed with a paid certificate, so if Windows says *"Windows protected your PC"*, click **More info**, then **Run anyway**. It installs for your user only; no administrator rights needed.
-2. Your browser opens the setup page ([Setting up your rigs](#setting-up-your-rigs)).
+2. The setup page opens in a window of its own ([Setting up your rigs](#setting-up-your-rigs)).
 3. When Windows Defender Firewall asks about `pythonw.exe`, allow it on **private networks**, so your phone can open the page.
 
 It sits in the system tray, starts at login and keeps the PC awake while it runs. Needs 64-bit Windows 10 or 11. More in [windows/README.md](windows/README.md).

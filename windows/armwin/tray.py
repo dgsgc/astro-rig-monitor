@@ -61,6 +61,35 @@ def set_at_login(on: bool):
                 pass
 
 
+def edge() -> str:
+    """Microsoft Edge's program, which every Windows 10 and 11 PC has, or "" if it's missing."""
+    for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            p = winreg.QueryValue(root, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe")
+            if p and os.path.exists(p.strip('"')):
+                return p.strip('"')
+        except OSError:
+            pass
+    for base in (os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramFiles")):
+        p = os.path.join(base or "", "Microsoft", "Edge", "Application", "msedge.exe")
+        if base and os.path.exists(p):
+            return p
+    return ""
+
+
+def open_app_window(url: str):
+    """A page in a window of its own (Edge's app mode: no tabs or address bar), or the normal
+    browser if Edge isn't there."""
+    e = edge()
+    if e:
+        try:
+            subprocess.Popen([e, f"--app={url}", "--window-size=820,900"], creationflags=CREATE_NO_WINDOW)
+            return
+        except OSError:
+            pass
+    webbrowser.open(url)
+
+
 def version_tuple(v: str):
     return tuple(int(x) if x.isdigit() else 0 for x in v.split("."))
 
@@ -114,7 +143,11 @@ class Actions:
         if not self.m.port:
             message("There's no web page", "The settings have no [web] section, so there's no page to open.")
             return
-        webbrowser.open(f"http://localhost:{self.m.port}{path}")
+        url = f"http://localhost:{self.m.port}{path}"
+        if path.startswith("/setup"):
+            open_app_window(url)                 # setup in a window of its own, not a browser tab
+        else:
+            webbrowser.open(url)
 
     def open_setup(self):
         self.open_page("/setup")

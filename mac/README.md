@@ -12,7 +12,7 @@ It sits in the menu bar. The monitor runs in the background on its own: it start
 2. **Unzip it** and drag **Astro Rig Monitor** into your **Applications** folder.
 3. **Open it the first time with right-click → Open**, then **Open** again. The app isn't notarised by Apple, so a plain double-click only says it can't check it. After the first time, it opens normally.
    - On recent macOS, if there's no Open button: System Settings → Privacy & Security, scroll down, **Open Anyway**.
-4. **Set up:** your browser opens the setup page. Add your rigs (use **Listen to detect its settings** while a rig is guiding), choose your phone alerts, and press **Save and start**.
+4. **Set up:** the setup page opens in a window of its own. Add your rigs (use **Listen to detect its settings** while a rig is guiding), choose your phone alerts, and press **Save and start**.
 5. **Allow what macOS asks for:**
    - "Background Items Added": that's the monitor. It shows under System Settings → General → Login Items.
    - "Find devices on your local network": click **Allow**, so it can reach your ASIAIRs or PHD2.
@@ -27,7 +27,7 @@ Needs macOS 13 Ventura or later.
 | Status | Running and how many rigs, not set up yet, or stopped |
 | Open in Browser on This Mac | The live web page |
 | Open on Your Phone… | A QR code to scan with your phone's camera, and the address to type or copy. The phone must be on the same WiFi. |
-| Add Rigs or Change Settings… | The setup page: add rigs, or start again (the old settings are kept as a backup) |
+| Add Rigs or Change Settings… | The setup page, in its own window: add rigs, or start again (the old settings are kept as a backup). After **Save and start** the window shows the monitor's page; close it when you're done. |
 | Send Test Notification | Checks your ntfy or Discord alerts arrive |
 | More → Edit Settings File… | `config.toml` in TextEdit, for settings the setup page doesn't cover ([configuration.md](../docs/configuration.md)). Then **Restart Monitor**. |
 | More → Import Settings File… | Use a `config.toml` from an earlier install |

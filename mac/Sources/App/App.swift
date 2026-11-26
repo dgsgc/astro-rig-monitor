@@ -37,6 +37,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             print("Stopped the monitor and removed its background item. Settings and logs are still in \(Paths.data.path)")
             exit(0)
         }
+        // --setup-window <url>: only show the setup window for that page (for testing the window
+        // against a throwaway monitor). Leaves the background service alone.
+        if let i = CommandLine.arguments.firstIndex(of: "--setup-window"), i + 1 < CommandLine.arguments.count,
+           let url = URL(string: CommandLine.arguments[i + 1]) {
+            SetupWindow.shared.show(url)
+            return
+        }
         Model.shared.firstLaunch()
     }
 }
@@ -229,7 +236,12 @@ final class Model: ObservableObject {
                   + "Use More → Edit Settings File… to add one.")
             return
         }
-        NSWorkspace.shared.open(URL(string: "http://localhost:\(port)\(path)")!)
+        let url = URL(string: "http://localhost:\(port)\(path)")!
+        if path.hasPrefix("/setup") {
+            SetupWindow.shared.show(url)          // its own window, not the browser
+        } else {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func copy(_ s: String) {

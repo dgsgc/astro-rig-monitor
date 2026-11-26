@@ -5,6 +5,7 @@ import logging
 import logging.handlers
 import os
 import signal
+import socket
 import sys
 import threading
 import time
@@ -147,6 +148,13 @@ def first_run_setup(args) -> bool:
     svc = SetupService(args.config, args.setup_from_lan, on_saved=done.set)
     host = "0.0.0.0" if args.setup_from_lan else "127.0.0.1"
     try:
+        # macOS lets 127.0.0.1:port share a port that another program holds on all addresses
+        # (say, a monitor that's already running), so check the whole port first.
+        probe = socket.socket()
+        try:
+            probe.bind(("0.0.0.0", args.setup_port))
+        finally:
+            probe.close()
         web = WebServer(WebHub({}), host, args.setup_port, stop, setup=svc, setup_only=True)
     except OSError as e:
         print(f"No {args.config} yet, and the setup page couldn't start on port {args.setup_port}: {e}\n"
