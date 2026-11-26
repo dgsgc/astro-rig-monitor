@@ -91,7 +91,8 @@ class SetupPage(unittest.TestCase):
         self.assertEqual((a.units, a.warn, a.alert, a.filter_wheel, a.lat), ("arcsec", 0.8, 1.2, True, 51.48))
         self.assertEqual((b.dialect, b.guide_scale, b.planned_stop_grace_s, b.screen_dithers), ("phd2", 2.4, 300, False))
         self.assertTrue(cfg.web.enabled and cfg.report.enabled and cfg.notify.enabled and cfg.mqtt.enabled)
-        self.assertEqual(oct(os.stat(self.path).st_mode & 0o777), "0o600")
+        if os.name == "posix":              # Windows has no Unix permissions
+            self.assertEqual(oct(os.stat(self.path).st_mode & 0o777), "0o600")
 
     def test_add_keeps_the_file_and_start_again_keeps_a_backup(self):
         original = '# my own notes\n[web]\nport = 8080\n\n[rigs.refractor]\nhost = "10.0.0.1"\nsky_image_url = "https://x/y.jpg"\n'
