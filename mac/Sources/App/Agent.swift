@@ -42,12 +42,23 @@ enum Agent {
         try FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: plist, options: .atomic)
         _ = launchctl(["bootout", "\(domain)/\(label)"])
-        let (code, out) = launchctl(["bootstrap", domain, plist.path])
-        if code != 0 && code != 37 {        // 37: already loaded
-            throw NSError(domain: "Agent", code: Int(code),
-                          userInfo: [NSLocalizedDescriptionKey: "launchctl bootstrap failed (\(code)): \(out)"])
+        // bootout returns while the old monitor is still shutting down, and until it has gone
+        // bootstrap fails with 5 (Input/output error). Wait for it (launchd gives it up to 20 s),
+        // then try a few times more.
+        let deadline = Date().addingTimeInterval(30)
+        while loaded && Date() < deadline { Thread.sleep(forTimeInterval: 0.25) }
+        var (code, out) = (Int32(0), "")
+        for attempt in 0..<5 {
+            (code, out) = launchctl(["bootstrap", domain, plist.path])
+            if code == 0 || code == 37 { return }       // 37: already loaded
+            if attempt < 4 { Thread.sleep(forTimeInterval: 1) }
         }
+        throw NSError(domain: "Agent", code: Int(code),
+                      userInfo: [NSLocalizedDescriptionKey: "launchctl bootstrap failed (\(code)): \(out)"])
     }
+
+    /// Does launchd have the service loaded (running or not)?
+    static var loaded: Bool { launchctl(["print", "\(domain)/\(label)"]).0 == 0 }
 
     static func remove() {
         _ = launchctl(["bootout", "\(domain)/\(label)"])
