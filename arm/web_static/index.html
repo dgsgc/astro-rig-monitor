@@ -207,7 +207,7 @@ body.detail .reports { display: none; }
       <div class="panel">
         <div class="graph-head">
           <span id="gTitle">Last 100 frames</span>
-          <span class="legend"><span><i style="background:var(--ra)"></i>RA</span><span><i style="background:var(--dec)"></i>Dec</span><span><i style="background:#ffffff22;height:9px"></i>dither / settle</span></span>
+          <span class="legend" id="legend"><span><i style="background:var(--ra)"></i>RA</span><span><i style="background:var(--dec)"></i>Dec</span><span><i style="background:#ffffff22;height:9px"></i>dither / settle</span></span>
         </div>
         <canvas class="graph" id="graph"></canvas>
       </div>
@@ -227,7 +227,8 @@ const BRIDGE_TIMEOUT_S = 30;   // no heartbeat this long -> bridge offline
 const HISTORY_MAX = 100;
 const STATE_LABEL = { guiding: "Guiding", dithering: "Dithering", settling: "Settling", star_lost: "Star lost",
   stopped: "Stopped", paused: "Paused", looping: "Looping", calibrating: "Calibrating", busy: "Busy",
-  idle: "Idle", unknown: "No data" };
+  idle: "Idle", unknown: "No data",
+  imaging: "Imaging", focusing: "Refocusing", done: "Done", error: "Error" };   // the last four: trackers
 const SEV = { idle: 0, ok: 1, warn: 2, alert: 3 };
 
 const rigs = new Map();         // id -> {id, name, state, rx, trend, hist:[{n,ra,dec,d}], sky, skyInfo, el}
@@ -263,13 +264,15 @@ function stateText(r, e) {
   const s = r.state;
   if (!s) return "Waiting for data";
   if (e.note) return e.note;
-  if (!s.armed && s.ended) return (s.ended === "plan" ? "Plan finished" : "Finished at dawn") + " · " + elapsed(nowS() - s.since) + " ago";
+  const tracker = s.kind === "tracker";
+  if (!s.armed && s.ended) return (s.ended === "plan" ? (tracker ? "Run finished" : "Plan finished") : "Finished at dawn") + " · " + elapsed(nowS() - s.since) + " ago";
   if ((e.level === "warn" || e.level === "alert") && s.reason_text)
     return s.reason_text + " · " + elapsed(nowS() - s.since);
   if (s.link === "down") return "Rig offline";
   if (s.state === "busy" && s.task) return s.task;
   let t = STATE_LABEL[s.state] || s.state;
-  if (s.state === "guiding" && s.guiding_since) t += " · " + elapsed(nowS() - s.guiding_since);
+  if (tracker && s.tracker && s.tracker.state_text) t = s.tracker.state_text;
+  if ((s.state === "guiding" || (tracker && s.armed)) && s.guiding_since) t += " · " + elapsed(nowS() - s.guiding_since);
   if (s.app && s.app.activity && s.state !== "busy") t += " · " + s.app.activity;
   return t;
 }
@@ -299,13 +302,22 @@ function drawRow(r) {
   el.className = "rig " + e.level + " lv-" + e.level;
   el.querySelector(".state").textContent = stateText(r, e);
   el.querySelector(".disarmed").hidden = !(r.state && !s.armed && !s.ended && s.state && s.state !== "idle");
-  const big = el.querySelector(".big");
-  big.innerHTML = sc ? `${fmt(sc.total)}<small>″</small>` : "–";
-  el.querySelector(".ra b").textContent = sc ? fmt(sc.ra) : "–";
-  el.querySelector(".dec b").textContent = sc ? fmt(sc.dec) : "–";
-  el.querySelector(".snr b").textContent = s.snr != null ? Math.round(s.snr) : "–";
+  const big = el.querySelector(".big"), tr = s.kind === "tracker" ? (s.tracker || {}) : null;
+  const sub = (cls, label, v) => { el.querySelector("." + cls).innerHTML = `${label} <b>${v}</b>`; };
+  if (tr) {   // tracker without guiding: frames instead of RMS, stars instead of RA/Dec
+    big.innerHTML = tr.frame != null && tr.total ? `${tr.frame}<small>/${tr.total}</small>` : "–";
+    sub("ra", "Stars", tr.star_size != null ? fmt(tr.star_size, 0) + "″" : "–");
+    sub("dec", "Found", tr.stars ?? "–");
+    sub("snr", tr.panel ? "Panel" : "Left", tr.panel ? `${tr.panel}/${tr.panels}` : (tr.remaining_s != null && s.armed ? elapsed(tr.remaining_s) : "–"));
+  } else {
+    big.innerHTML = sc ? `${fmt(sc.total)}<small>″</small>` : "–";
+    sub("ra", "RA", sc ? fmt(sc.ra) : "–");
+    sub("dec", "Dec", sc ? fmt(sc.dec) : "–");
+    sub("snr", "SNR", s.snr != null ? Math.round(s.snr) : "–");
+  }
   el.querySelector(".age").textContent = s.last_frame_ts ? "frame " + elapsed(nowS() - s.last_frame_ts) + " ago" : "";
-  el.setAttribute("aria-label", `${r.name}: ${stateText(r, e)}, total ${sc ? fmt(sc.total) : "no data"}`);
+  el.setAttribute("aria-label", tr ? `${r.name}: ${stateText(r, e)}, frame ${tr.frame ?? "–"} of ${tr.total ?? "–"}`
+    : `${r.name}: ${stateText(r, e)}, total ${sc ? fmt(sc.total) : "no data"}`);
   drawSpark(el.querySelector("canvas"), r);
 }
 function sizeCanvas(c) {
@@ -317,13 +329,22 @@ function sizeCanvas(c) {
 function drawSpark(c, r) {
   const [g, w, h] = sizeCanvas(c);
   const pts = (r.trend && r.trend.total) || [];
-  const th = (r.state && r.state.thresholds) || { warn: 0.8, alert: 1.0 };
+  let th = (r.state && r.state.thresholds) || { warn: 0.8, alert: 1.0 };
   const vals = pts.filter((v) => v !== null);
+  const tr = r.state && r.state.kind === "tracker" ? (r.state.tracker || {}) : null;
+  let bottom = 0, lines = [[th.warn, css("--amber-dk")], [th.alert, css("--red-dk")]];
+  if (tr) {   // star size, from 60% of the run's start, with the size that warns of focus drift
+    const base = tr.base_size || (vals.length ? Math.min(...vals) : 30);
+    const warn = base * (1 + (tr.focus_warn_pct ?? 30) / 100);
+    th = { warn, alert: warn };
+    bottom = Math.min(base * 0.6, ...vals);
+    lines = [[warn, css("--amber-dk")]];
+  }
   const top = Math.max(th.alert * 1.25, ...vals, 0.1);
-  const y = (v) => h - 2 - (v / top) * (h - 4);
+  const y = (v) => h - 2 - ((v - bottom) / (top - bottom)) * (h - 4);
   const k = gscale();
   g.setLineDash([3 * k, 3 * k]); g.lineWidth = k;
-  for (const [v, col] of [[th.warn, css("--amber-dk")], [th.alert, css("--red-dk")]]) {
+  for (const [v, col] of lines) {
     g.strokeStyle = col; g.beginPath(); g.moveTo(0, y(v)); g.lineTo(w, y(v)); g.stroke();
   }
   g.setLineDash([]);
@@ -366,7 +387,9 @@ function drawDetail() {
   const s = r.state || {}, e = effective(r), sc = s.screen, th = s.thresholds || {};
   const b = $("dBadge"); b.className = "badge " + e.level; b.textContent = e.level === "idle" ? (s.ended ? "Done" : s.armed === false && s.state && s.state !== "idle" ? "Disarmed" : "Idle") : e.level;
   $("dState").textContent = stateText(r, e);
+  if (s.kind === "tracker") { drawTrackerDetail(r, s); return; }
   $("gTitle").textContent = `Last ${r.hist.length || HISTORY_MAX} frames`;
+  $("legend").innerHTML = LEGEND_GUIDED;
   const snr = s.snr != null ? Math.round(s.snr) + (s.snr_trend && s.snr_trend !== "steady" ? ` <small>${esc(s.snr_trend)}</small>` : "") : "–";
   $("stats").innerHTML =
     stat("Total RMS", sc ? fmt(sc.total) : "–", "″") +
@@ -383,6 +406,56 @@ function drawDetail() {
     stat("Alerts", s.armed ? "Armed" : "Off") +
     appStats(s.app);
   drawGraph(r);
+}
+const LEGEND_GUIDED = `<span><i style="background:var(--ra)"></i>RA</span><span><i style="background:var(--dec)"></i>Dec</span><span><i style="background:#ffffff22;height:9px"></i>dither / settle</span>`;
+function drawTrackerDetail(r, s) {
+  const tr = s.tracker || {}, th = r.thist || { size: [], stars: [], refocus: [] };
+  $("gTitle").textContent = `${th.size.length} measured frames`;
+  $("legend").innerHTML = `<span><i style="background:var(--ra)"></i>star size</span><span><i style="background:var(--dec)"></i>stars found</span><span><i style="background:#ffffff22;height:9px"></i>refocus</span>`;
+  const pct = tr.size_change_pct;
+  $("stats").innerHTML =
+    stat("Frame", tr.frame != null ? `${tr.frame}<small> / ${tr.total ?? "–"}</small>` : "–") +
+    stat("Time left", tr.remaining_s != null && s.armed ? elapsed(tr.remaining_s) : "–") +
+    stat("Panel", tr.panel ? `${tr.panel}<small> / ${tr.panels}</small>` : "–") +
+    stat("Plan", tr.plan ? esc(tr.plan) + (tr.panel_name ? ` <small>${esc(tr.panel_name)}</small>` : "") : "–") +
+    stat("Star size", tr.star_size != null ? `<span style="color:var(--ra)">${fmt(tr.star_size, 0)}</span>` : "–", "″") +
+    stat("At the start", tr.base_size != null ? fmt(tr.base_size, 0) + "<small>″</small>" + (pct != null ? ` <small>now ${pct > 0 ? "+" : ""}${pct}%</small>` : "") : "–") +
+    stat("Stars found", tr.stars != null ? `<span style="color:var(--dec)">${tr.stars}</span>` + (tr.base_stars ? ` <small>of ${tr.base_stars}</small>` : "") : "–") +
+    stat("Refocused", tr.refocused ?? "–") +
+    stat("Dithers", tr.dithers ?? "–") +
+    stat("Camera battery", tr.battery != null ? tr.battery : (tr.camera === false ? "<small>no camera</small>" : "–"), tr.battery != null ? "%" : "") +
+    stat("Shots left", tr.shots ?? "–") +
+    stat("Alerts", s.armed ? "Armed" : "Off") +
+    (tr.error ? stat("Error", `<span style="color:var(--red)">${esc(tr.error)}</span>`) : "");
+  const [g, w, h] = sizeCanvas($("graph"));
+  const k = gscale(), padL = 34 * k, padR = 34 * k, padT = 6 * k, padB = 6 * k, gw = w - padL - padR, gh = h - padT - padB;
+  const size = th.size, stars = th.stars, n = Math.max(size.length, 2);
+  const sv = size.filter((v) => v != null), cv = stars.filter((v) => v != null);
+  const sLo = Math.floor(Math.min(...sv, tr.base_size || 99) * 0.8), sHi = Math.ceil(Math.max(...sv, (tr.base_size || 0) * 1.4, sLo + 5));
+  const cHi = Math.max(...cv, tr.base_stars || 0, 10) * 1.2;
+  const x = (i) => padL + (i / (n - 1)) * gw;
+  const ys = (v) => padT + gh - ((v - sLo) / (sHi - sLo)) * gh, yc = (v) => padT + gh - (v / cHi) * gh;
+  g.font = `${11 * k}px -apple-system, sans-serif`; g.textBaseline = "middle"; g.lineWidth = k; g.strokeStyle = css("--line");
+  for (let q = 0; q <= 4; q++) {
+    const yy = padT + gh * q / 4;
+    g.beginPath(); g.moveTo(padL, yy); g.lineTo(w - padR, yy); g.stroke();
+    g.fillStyle = css("--ra"); g.textAlign = "right"; g.fillText(Math.round(sHi - (sHi - sLo) * q / 4) + "″", padL - 5 * k, yy);
+    g.fillStyle = css("--dec"); g.textAlign = "left"; g.fillText(Math.round(cHi - cHi * q / 4), w - padR + 5 * k, yy);
+  }
+  g.fillStyle = "rgba(255,255,255,0.09)";
+  for (const i of th.refocus || []) g.fillRect(x(i) - gw / n / 2, padT, Math.max(gw / n, 3 * k), gh);
+  if (tr.base_size) {
+    g.setLineDash([3 * k, 3 * k]); g.strokeStyle = css("--amber-dk");
+    const y = ys(tr.base_size * (1 + (tr.focus_warn_pct ?? 30) / 100));
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR, y); g.stroke(); g.setLineDash([]);
+  }
+  for (const [arr, col, y] of [[stars, css("--dec"), yc], [size, css("--ra"), ys]]) {
+    g.strokeStyle = col; g.lineWidth = 1.6 * k; g.lineJoin = "round"; g.beginPath();
+    let pen = false;
+    arr.forEach((v, i) => { if (v == null) { pen = false; return; } pen ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); pen = true; });
+    g.stroke();
+  }
+  if (!sv.length) { g.textAlign = "center"; g.fillStyle = css("--muted"); g.fillText("No measured frames yet", padL + gw / 2, padT + gh / 2); }
 }
 function drawGraph(r) {
   const [g, w, h] = sizeCanvas($("graph"));
@@ -449,6 +522,7 @@ function onMessage(m) {
     case "state": r.state = m.d; r.rx = nowS(); if (m.d.name) r.name = m.d.name; break;
     case "trend": r.trend = m.d; break;
     case "history": {
+      if (m.d.kind === "tracker") { r.thist = { size: m.d.size || [], stars: m.d.stars || [], refocus: m.d.refocus || [] }; break; }
       const dith = new Set(m.d.dither || []);
       r.hist = (m.d.ra || []).map((ra, i) => ({ n: m.d.n0 + i, ra, dec: m.d.dec[i], d: dith.has(m.d.n0 + i) })).slice(-HISTORY_MAX);
       break;

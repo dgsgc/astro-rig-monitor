@@ -97,18 +97,29 @@ class RigSettings:
     alert_method: str = "stdev"      # figure the alert bands use
     alert_window: int = 30           # frames, dithers/settles excluded
     alert_min_frames: int = 10       # frames needed before RMS can change the level
+    # dialect = "tracker" only (arm/tracker.py): a tracker without guiding, read from a status page
+    status_url: Optional[str] = None # default http://<host>/status
+    poll_s: float = 10.0             # how often the status page is read
+    cloud_drop: float = 0.5          # stars found below this fraction of the run's start -> WARN cloud
+    focus_warn_pct: float = 30.0     # stars this % larger than at the run's start -> WARN focus
+    battery_warn: int = 20           # camera battery % -> WARN
+    battery_alert: int = 10          # camera battery % -> ALERT
 
     def __post_init__(self):
         if not self.name:
             self.name = self.id
         if self.units not in ("pixels", "arcsec"):
             raise ValueError(f"{self.id}: units must be 'pixels' or 'arcsec'")
-        if self.dialect not in ("asiair", "phd2"):
-            raise ValueError(f"{self.id}: dialect must be 'asiair' or 'phd2'")
+        if self.dialect not in ("asiair", "phd2", "tracker"):
+            raise ValueError(f"{self.id}: dialect must be 'asiair', 'phd2' or 'tracker'")
+        if self.dialect == "tracker" and not (self.host or self.status_url):
+            raise ValueError(f"{self.id}: a tracker needs host or status_url")
         if not self.warn < self.alert:
             raise ValueError(f"{self.id}: warn must be below alert")
         if self.links == 0:
             self.links = 2 if self.dialect == "asiair" else 1
+        if self.dialect == "tracker":
+            self.links = 1
         if self.app_port is not None and self.dialect != "asiair":
             raise ValueError(f"{self.id}: app_port is for ASIAIR rigs only")
         if not 1 <= self.links <= 4:

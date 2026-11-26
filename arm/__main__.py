@@ -17,6 +17,7 @@ from .publish import MqttOut, NullOut, PrintOut, Scheduler
 from .recorder import NightRecorder
 from .sky import SkyFetcher
 from .source import RigReader
+from .tracker import TrackerMonitor, TrackerReader
 from .web import Tee, WebHub, WebServer
 
 log = logging.getLogger("arm")
@@ -49,7 +50,7 @@ def main(argv=None):
     log.info("Astro Rig Monitor %s starting, rigs: %s", __version__, ", ".join(r.id for r in cfg.rigs))
 
     now = time.time()
-    monitors = {r.id: RigMonitor(r, now) for r in cfg.rigs}
+    monitors = {r.id: (TrackerMonitor if r.dialect == "tracker" else RigMonitor)(r, now) for r in cfg.rigs}
     out_cls = PrintOut if args.dry_run else MqttOut if cfg.mqtt.enabled else NullOut
     out = out_cls(cfg.bridge_id, cfg.mqtt, monitors)
     listeners = []
@@ -63,7 +64,8 @@ def main(argv=None):
     rep = cfg.report
     if rep.enabled:
         recorder = NightRecorder(rep.nights_dir, rep.keep_days)
-        MorningReport(cfg.rigs, rep.nights_dir, rep.reports_dir, rep.at, rep.keep_days, stop).start()
+        # Trackers are recorded, but the report only covers guided rigs for now.
+        MorningReport([r for r in cfg.rigs if r.dialect != "tracker"], rep.nights_dir, rep.reports_dir, rep.at, rep.keep_days, stop).start()
         log.info("night reports: recording to %s, report each morning after %s", rep.nights_dir, rep.at)
     web = hub = None
     if cfg.web.enabled:
@@ -83,6 +85,9 @@ def main(argv=None):
             signal.signal(getattr(signal, sig), lambda *_: stop.set())
 
     for m in monitors.values():
+        if m.s.dialect == "tracker":
+            TrackerReader(m, stop, recorder).start()
+            continue
         RigReader(m, stop, recorder).start()
         if m.s.app_port:
             log.info("[%s] also reading the ASIAIR app port %s (unofficial, read-only)", m.s.id, m.s.app_port)

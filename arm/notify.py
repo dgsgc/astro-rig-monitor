@@ -44,11 +44,22 @@ def describe(name: str, st: dict) -> Tuple[str, str]:
         if reason == "rms_high":
             edge = th.get("alert") if level == "alert" else th.get("warn")
             body = f"Total RMS {_arcsec(st.get('alert_total'))} ({level} above {_arcsec(edge)})."
+        elif st.get("kind") == "tracker":
+            tr = st.get("tracker") or {}
+            body = f"{cause}. Run: {tr.get('state_text') or st.get('state')}"
+            if tr.get("frame") is not None and tr.get("total"):
+                body += f", frame {tr['frame']} of {tr['total']}"
+            body += "."
+            if reason == "run_error" and tr.get("error"):
+                body += f" {tr['error']}"
         else:
             body = f"{cause}. Guiding state: {st.get('state')}."
             if st.get("task"):
                 body += f" Task: {st['task']}."
         return title, body
+    tracker = st.get("kind") == "tracker"
+    if st.get("ended") == "plan" and tracker:
+        return f"{name}: run finished", "The run has ended. The rig is disarmed until the next run starts."
     if st.get("ended") == "plan":
         return f"{name}: plan finished", "The plan stopped the guide camera. The rig is disarmed until guiding starts again."
     if st.get("ended") == "dawn":
@@ -56,7 +67,9 @@ def describe(name: str, st: dict) -> Tuple[str, str]:
     if not st.get("armed", True):
         return f"{name}: disarmed", "Alerts for this rig are off until it is armed again."
     if level == "idle":
-        return f"{name}: idle", "Guiding isn't running."
+        return f"{name}: idle", "No run is going." if tracker else "Guiding isn't running."
+    if tracker:
+        return f"{name}: back to OK", "Imaging normally again."
     total = st.get("alert_total")
     return f"{name}: back to OK", ("Guiding normally again." if total is None else f"Total RMS {_arcsec(total)}.")
 

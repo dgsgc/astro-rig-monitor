@@ -82,6 +82,10 @@ class NightRecorder:
             return
         self._write(rig, t, {"t": round(t, 3), "raw": text})
 
+    def tracker(self, rig: str, status: dict, t: float):
+        """A tracker's status (arm/tracker.py), kept as {"t", "tracker"} when its run changes."""
+        self._write(rig, t, {"t": round(t, 3), "tracker": status})
+
     def connected(self, rig: str, t: float):
         self._write(rig, t, {"t": round(t, 3), "note": "connected"})
 

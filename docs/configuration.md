@@ -23,7 +23,7 @@ A section is on when it's present: delete or comment out its `[...]` line to tur
 | `host`, `port` | –, 4400 | Where the ASIAIR or PHD2 is |
 | `app_port` | none | ASIAIR only, optional: also listen to the ASIAIR app's own port (4700) for autofocus, filter changes and plan progress. See [The ASIAIR app port](#the-asiair-app-port-optional) |
 | `links` | 0 (auto) | Read-only connections held open at once: 0 picks 2 for an ASIAIR, 1 for PHD2 |
-| `dialect` | "asiair" | "asiair" or "phd2" (PHD2, including PHD2 run by NINA) |
+| `dialect` | "asiair" | "asiair", "phd2" (PHD2, including PHD2 run by NINA), or "tracker" (a tracker without guiding; see [Trackers without guiding](#trackers-without-guiding)) |
 | `units` | "pixels" | What the rig reports guiding errors in: "arcsec" or "pixels" (see below) |
 | `guide_scale` | 1.0 | Arcsec per guide-camera pixel, binning included. Only used with `units = "pixels"`. Or give `guide_pixel_um`, `guide_focal_mm` and `guide_binning` and it's worked out |
 | `warn`, `alert` | 0.80, 1.00 | Total RMS (arcsec) above which the rig is in WARN / ALERT |
@@ -78,6 +78,30 @@ kept open and nothing is missed.
 > `app_port`: guiding, levels and alerts all come from port 4400, odd lines on 4700 are
 > counted and ignored, and pauses fall back to "Paused by plan". The firmware it saw is shown
 > as `app.firmware` in the rig's state. Please open an issue if a firmware update breaks it.
+
+### Trackers without guiding
+
+A camera on a star tracker with no guiding, run by a small controller that takes the frames, dithers between them and measures each frame's stars, can be watched too (`dialect = "tracker"`). There's no guide graph or RMS: the page shows the frame count, the star size and how many stars were found, and the detail view graphs both across the run. The monitor reads the controller's status page every `poll_s` seconds (an HTTP GET; nothing is ever sent to the rig).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `host` or `status_url` | – | The controller; the status page is `http://<host>/status` unless `status_url` says otherwise |
+| `poll_s` | 10 | How often the status page is read |
+| `cloud_drop` | 0.5 | Stars found below this fraction of the run's start → WARN "Cloud?" |
+| `focus_warn_pct` | 30 | Stars this much larger (%) than at the run's start → WARN "Focus drifting" |
+| `battery_warn`, `battery_alert` | 20, 10 | Camera battery (%) → WARN / ALERT |
+| `persist_s`, `offline_grace_s`, `lat`, `lon`, `sky_image_url` | as above | Work the same as for guided rigs |
+
+It alerts when the run stops with an error, when the controller can't be reached while a run is going, and on a low camera battery; it warns on cloud, focus drift, and a card with fewer shots left than frames left in the run. A run starting arms the rig; the run finishing (or being stopped) disarms it. Trackers are recorded with the other rigs but aren't in the night report yet.
+
+The status page is JSON. The fields it uses are listed at the top of [`arm/tracker.py`](../arm/tracker.py): `state` (e.g. "Exposing", "Dithering", "Done", "Error"), `frame` and `total`, `remaining_s`, `camera` (`batterylevel`, `availableshots`), and `frame_focus` with each measured frame's star size (`history`) and star count (`counts`) and the run's starting `baseline` and `baseline_stars`. Any controller that serves these can be watched.
+
+```toml
+[rigs.tracker]
+name = "Tracker"
+dialect = "tracker"
+host = "tracker.local"
+```
 
 ### PHD2 and NINA
 

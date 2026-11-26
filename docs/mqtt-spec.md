@@ -91,6 +91,24 @@ The main message, enough to draw a rig's row on the overview and the text on the
 | `app` | `null` unless the rig has `app_port` set. Otherwise what the ASIAIR app port said: `link` (`"up"`/`"down"`), `firmware` (e.g. `"14.39"`), `activity` (what the plan is doing right now, e.g. `"AF: new filter"`, `"Filter change"`, or `null`), `activity_since`, `plan` (`target`, `target_done`, `target_total`, `done`, `total`, `target_index`, `targets`, `finished`, or `null`), `filter`, `exposure_s`, `last_af` (`ts`, `ok`, `why`: `"filter"`/`"timer"`/`"temperature"`/`null`, `position`, `hfr`), `af_runs`, `health` (list, e.g. `["under-voltage"]`). The port is unofficial: any field may be `null` if a firmware stops sending it. While a planned pause is explained by it, `task` carries the same label as `activity` |
 | `ended` | Why the bridge disarmed the rig itself: `"dawn"` (the sun is rising past `dawn_sun_alt` and guiding has stopped) or `"plan"` (an ASIAIR plan finished: its guide camera stopped looping after a planned stop). `null` otherwise, and cleared when guiding starts again |
 
+#### Trackers without guiding (`"kind": "tracker"`)
+
+A tracker (`dialect = "tracker"`) has no guiding figures: `screen`, `alert_total`, `last_good_total`, `snr` and `hfd` are `null`. Its state message adds `"kind": "tracker"` and a `tracker` object:
+
+```json
+"tracker": {
+  "state_text": "Exposing", "frame": 34, "total": 60, "remaining_s": 1560, "dithers": 33, "error": null,
+  "star_size": 41.0, "stars": 148, "last_stars": 151, "base_size": 39.0, "base_stars": 150,
+  "size_change_pct": 5, "refocused": 1, "battery": 62, "shots": 812, "camera": true,
+  "focus_warn_pct": 30.0, "cloud_drop": 0.5,
+  "plan": "M31 mosaic", "panel": 2, "panels": 4, "panel_name": "Panel 2"
+}
+```
+
+`state` is one of `imaging`, `dithering`, `settling`, `focusing`, `paused`, `idle`, `done`, `stopped`, `error`; `state_text` is the controller's own word for it. `star_size` (arcsec) and `stars` are the median of the last three measured frames; `last_stars` is the latest frame, even one too cloudy to measure. `plan`/`panel` only appear while a mosaic panel is being shot. `guiding_since` is when the run started. Reasons: `run_error`, `rig_offline`, `camera_battery`, `cloud`, `focus_drift`, `card_space`.
+
+Its `trend` has `"kind": "tracker"`, star size in `total` and stars found in `stars`. Its `history` has `"kind": "tracker"`, `size` and `stars` per measured frame of the run (up to 100), and `refocus`, the index where the last refocus happened; `ra`, `dec` and `dither` are empty. There are no `frame` messages.
+
 ### `arm/rig/<rig>/trend`
 
 For the 10-minute sparkline on the overview: `alert_total` in 20 s buckets, oldest first, 30 points. `null` marks gaps (stopped, dithering).
