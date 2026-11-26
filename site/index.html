@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astro Rig Monitor: every ASIAIR rig on one screen</title>
+<meta name="description" content="Free monitor for ASIAIR and PHD2 rigs: all your rigs' guiding on one page, and a phone alert only when something goes wrong. Read-only, for Mac, Windows and Raspberry Pi.">
+<meta property="og:title" content="Astro Rig Monitor">
+<meta property="og:description" content="Every ASIAIR rig on one screen, and a phone alert only when guiding goes wrong.">
+<meta property="og:image" content="https://dgsgc.github.io/astro-rig-monitor/img/desktop-overview.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%234fb06d' stroke-width='3'/%3E%3Cpath d='M16 2v8M16 22v8M2 16h8M22 16h8' stroke='%234fb06d' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0e1013; --panel: #171a1f; --line: #262a31; --text: #e8eaed; --text2: #a3a9b3;
+  --ok: #4fb06d; --warn: #e0a43a; --alert: #e25b4b; --link: #7cb8ff;
+  --r: 12px; --max: 1080px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--link); }
+img { max-width: 100%; height: auto; display: block; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+section { padding: 56px 0; border-top: 1px solid var(--line); }
+h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; margin: 0 0 14px; letter-spacing: -0.02em; }
+h2 { font-size: clamp(23px, 3.2vw, 30px); line-height: 1.2; margin: 0 0 18px; letter-spacing: -0.01em; }
+h3 { font-size: 18px; margin: 0 0 6px; }
+p { margin: 0 0 14px; }
+.lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--text2); max-width: 720px; }
+.muted { color: var(--text2); }
+small, .small { font-size: 14px; color: var(--text2); }
+
+/* top */
+header { padding: 18px 0; }
+header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text); text-decoration: none; }
+.brand svg { width: 24px; height: 24px; }
+header nav a { color: var(--text2); text-decoration: none; margin-left: 18px; font-size: 15px; }
+header nav a:hover { color: var(--text); }
+.hero { padding: 36px 0 56px; }
+.hero .shot { margin-top: 34px; }
+
+/* buttons */
+.dl { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 8px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 10px; font-weight: 600; font-size: 16px;
+       text-decoration: none; border: 1px solid #3c434e; color: var(--text); background: #20252c; }
+.btn.primary { background: var(--ok); border-color: var(--ok); color: #08130c; }
+.btn:hover { filter: brightness(1.1); }
+.btn .sub { font-weight: 400; font-size: 13px; opacity: .8; }
+
+/* screenshots */
+.shot { border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; background: #000; }
+.cap { font-size: 14px; color: var(--text2); margin-top: 8px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.phone { aspect-ratio: 600 / 1298; }
+.phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+
+/* points */
+.points { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 34px; margin-top: 8px; }
+.point { padding-left: 16px; border-left: 3px solid var(--line); }
+.point p { color: var(--text2); margin: 0; }
+.point.ok { border-color: var(--ok); } .point.warn { border-color: var(--warn); } .point.alert { border-color: var(--alert); }
+
+/* levels table */
+.levels { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 16px; }
+.levels td { padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+.levels td:first-child { white-space: nowrap; font-weight: 600; width: 1%; }
+.tag { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 13px; font-weight: 700; }
+.tag.ok { background: rgba(79,176,109,.18); color: var(--ok); }
+.tag.warn { background: rgba(224,164,58,.18); color: var(--warn); }
+.tag.alert { background: rgba(226,91,75,.2); color: var(--alert); }
+
+/* install */
+.install { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; }
+.card ol { margin: 10px 0 0; padding-left: 20px; color: var(--text2); }
+.card li { margin-bottom: 6px; }
+.card .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+code { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: #0a0c0f; border: 1px solid var(--line);
+       border-radius: 6px; padding: 2px 6px; word-break: break-all; }
+pre { margin: 10px 0 0; } pre code { display: block; padding: 10px; white-space: pre-wrap; }
+.copy { margin-top: 8px; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: none; color: var(--text2); cursor: pointer; }
+
+footer { padding: 36px 0 60px; border-top: 1px solid var(--line); color: var(--text2); font-size: 15px; }
+footer a { color: var(--text2); }
+
+@media (max-width: 820px) {
+  .points, .install { grid-template-columns: 1fr; }
+  header nav { display: none; }
+  section { padding: 44px 0; }
+}
+@media (max-width: 520px) {
+  .grid3 { grid-template-columns: 1fr 1fr; }
+  .grid3 > :nth-child(3) { display: none; }
+  .wrap { padding: 0 16px; }
+  .btn { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="#4fb06d" stroke-width="3"/><path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="#4fb06d" stroke-width="3"/></svg>Astro Rig Monitor</a>
+    <nav><a href="#why">Why</a><a href="#install">Install</a><a href="https://github.com/dgsgc/astro-rig-monitor">GitHub</a></nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap hero">
+  <h1>Every ASIAIR rig on one screen.<br>An alert only when guiding goes wrong.</h1>
+  <p class="lead">Running more than one ASIAIR means flicking between rigs in the app to check each one is still guiding. Astro Rig Monitor watches them all at once, and tells your phone when one needs you.</p>
+  <div class="dl" id="dl">
+    <a class="btn primary" data-os="mac" href="#install">Download for Mac</a>
+    <a class="btn" data-os="win" href="#install">Download for Windows</a>
+    <a class="btn" data-os="pi" href="#pi">Raspberry Pi</a>
+  </div>
+  <p class="small">Free and open source. Read-only: it never sends a command to your rigs.</p>
+  <div class="shot"><img src="img/desktop-overview.jpg" width="1600" height="1000" alt="Three rigs on one page: one guiding well, one with RMS creeping up, one that has lost its star"></div>
+  <p class="cap">A demo night: one rig guiding well, one with RMS creeping up (warning), one that has lost its guide star (alert).</p>
+</div>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Why it's useful with several ASIAIRs</h2>
+    <div class="points">
+      <div class="point"><h3>All rigs at a glance</h3><p>Total RMS, RA/Dec, guide-star SNR and a 10-minute trend for every rig, on your phone, tablet or computer. No switching between devices in the app.</p></div>
+      <div class="point"><h3>Alerts only when it matters</h3><p>RMS too high, star lost, guiding stopped and not back, a rig gone offline. One bad frame never alerts. Free phone alerts through ntfy, or Discord.</p></div>
+      <div class="point"><h3>Knows a routine pause from a problem</h3><p>Dithers, autofocus, filter changes, gotos and meridian flips don't set it off. An autofocus or flip that never finishes does.</p></div>
+      <div class="point"><h3>Quiet when the night's done</h3><p>A rig disarms itself when its plan finishes or the sun comes up, so you're not woken by a rig that's simply parked.</p></div>
+      <div class="point"><h3>A report every morning</h3><p>One page per night: each rig's guiding through the night, every alert, and why each pause happened.</p></div>
+      <div class="point"><h3>Safe to run on a live plan</h3><p>It only listens to the guiding the ASIAIR already broadcasts, so it can't upset a running plan. Use the ASIAIR app as normal alongside it.</p></div>
+    </div>
+    <p class="small" style="margin-top:22px">Also works with PHD2 on its own or driven by N.I.N.A., and with a remote observatory over Tailscale or another VPN.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>On your phone</h2>
+    <p class="muted">Add it to your Home Screen and it opens like an app. Tap a rig for its guide graph.</p>
+    <div class="grid3">
+      <div><div class="shot phone"><img src="img/phone-overview.jpg" width="600" height="1298" alt="All rigs on a phone" loading="lazy"></div><p class="cap">All rigs</p></div>
+      <div><div class="shot phone"><img src="img/phone-kkro-alert.jpg" width="600" height="1526" alt="A rig in alert on a phone" loading="lazy"></div><p class="cap">A rig in alert</p></div>
+      <div><div class="shot phone"><img src="img/phone-sqa55-detail.jpg" width="600" height="1800" alt="A rig's guide graph on a phone" loading="lazy"></div><p class="cap">A rig's guide graph and stats</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What it tells you</h2>
+    <table class="levels">
+      <tr><td><span class="tag ok">OK</span></td><td>Guiding, with total RMS below your warning level.</td></tr>
+      <tr><td><span class="tag warn">WARN</span></td><td>Total RMS above your warning level for about 20 seconds.</td></tr>
+      <tr><td><span class="tag alert">ALERT</span></td><td>RMS above your alert level; star lost or guiding stopped and not back; a task that's taking too long; settling failing again and again; the rig gone offline.</td></tr>
+    </table>
+    <p class="small" style="margin-top:14px">You set the levels for each rig. A good start is a warning at half your imaging pixel scale.</p>
+    <div class="shot" style="margin-top:26px"><img src="img/desktop-102ed-detail.jpg" width="1600" height="1176" alt="A rig's detail page: guide graph with dithers, stats, target and sky camera" loading="lazy"></div>
+    <p class="cap">A rig's detail page: the last 100 frames with dithers shaded, the stats, and, from the ASIAIR's app port (optional), the target, sub count, filter and last autofocus.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Optional: a desk display</h2>
+    <p class="muted">A small touch screen with a warning light, for beside the sofa. The firmware is included for a low-cost ESP32 board.</p>
+    <div class="grid3">
+      <div><div class="shot"><img src="img/esp32-overview.jpg" width="720" height="500" alt="Desk display: all rigs" loading="lazy"></div></div>
+      <div><div class="shot"><img src="img/esp32-sqa55-graph.jpg" width="720" height="500" alt="Desk display: guide graph" loading="lazy"></div></div>
+      <div><div class="shot"><img src="img/esp32-kkro-sky.jpg" width="720" height="500" alt="Desk display: sky camera" loading="lazy"></div></div>
+    </div>
+    <p class="small" style="margin-top:12px">Or use a tablet, a Raspberry Pi screen or Home Assistant: <a href="https://github.com/dgsgc/astro-rig-monitor/blob/main/docs/build-a-display.md">build your own display</a>.</p>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="muted">Run it on a computer that stays on through the night, on the same network as your rigs.</p>
+    <div class="install">
+      <div class="card" id="mac">
+        <h3>Mac</h3>
+        <span class="small">macOS 13 or later</span>
+        <ol>
+          <li>Download, unzip, and drag it into Applications.</li>
+          <li>First time: right-click it, choose <b>Open</b>, then <b>Open</b> again.</li>
+          <li>Add your rigs in the setup window and press <b>Save and start</b>.</li>
+        </ol>
+        <div class="btns">
+        <a class="btn primary" data-asset="mac-arm" href="https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Apple-Silicon.zip">Apple Silicon <span class="sub">M1 and later</span></a>
+        <a class="btn" data-asset="mac-intel" href="https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Intel.zip">Intel</a>
+        </div>
+        <p class="small" style="margin-top:10px">Which Mac? Apple menu → About This Mac. It lives in the menu bar.</p>
+      </div>
+      <div class="card" id="win">
+        <h3>Windows</h3>
+        <span class="small">Windows 10 or 11, 64-bit</span>
+        <ol>
+          <li>Download and run the installer. If Windows warns you, click <b>More info</b> → <b>Run anyway</b>.</li>
+          <li>Add your rigs in the setup window and press <b>Save and start</b>.</li>
+          <li>Allow it through the firewall on private networks.</li>
+        </ol>
+        <div class="btns"><a class="btn primary" data-asset="win" href="https://github.com/dgsgc/astro-rig-monitor/releases/download/win-v0.1.1/Astro-Rig-Monitor-Setup.exe">Download installer</a></div>
+        <p class="small" style="margin-top:10px">It lives in the system tray.</p>
+      </div>
+      <div class="card" id="pi">
+        <h3>Raspberry Pi or Linux</h3>
+        <span class="small">Raspberry Pi OS, Debian 12+, Ubuntu 24.04+</span>
+        <ol>
+          <li>Paste this into a terminal on the Pi:
+            <pre><code id="cmd">curl -fsSL https://raw.githubusercontent.com/dgsgc/astro-rig-monitor/main/tools/install.sh | bash</code></pre>
+            <button class="copy" type="button" id="copy">Copy</button></li>
+          <li>Open the address it prints on your phone, add your rigs and press <b>Save and start</b>.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="small" style="margin-top:20px">Then open it on your phone: the app's menu has <b>Open on Your Phone…</b> with a QR code. Phone alerts use the free <a href="https://ntfy.sh">ntfy</a> app.
+      <span id="ver"></span></p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Astro Rig Monitor is free and open source (MIT). It reads the guiding events that ASIAIR and PHD2 broadcast on port 4400; it isn't made by or connected with ZWO.</p>
+    <p><a href="https://github.com/dgsgc/astro-rig-monitor">Source and documentation on GitHub</a> ·
+       <a href="https://github.com/dgsgc/astro-rig-monitor/blob/main/docs/configuration.md">All settings</a> ·
+       <a href="https://github.com/dgsgc/astro-rig-monitor/releases">All releases</a> ·
+       <a href="https://github.com/dgsgc/astro-rig-monitor/issues">Questions and problems</a></p>
+  </div>
+</footer>
+
+<script>
+// Point the download buttons at the newest Mac and Windows releases (the links in the page are a
+// fallback, used if GitHub can't be asked), and put this visitor's computer first.
+(async () => {
+  try {
+    const r = await fetch("https://api.github.com/repos/dgsgc/astro-rig-monitor/releases?per_page=30");
+    if (!r.ok) return;
+    const rels = (await r.json()).filter(x => !x.draft && !x.prerelease);
+    const newest = p => rels.find(x => x.tag_name.startsWith(p));
+    const asset = (rel, name) => rel && (rel.assets.find(a => a.name === name) || {}).browser_download_url;
+    const mac = newest("mac-v"), win = newest("win-v"), mon = newest("v");
+    const set = (key, url) => url && document.querySelectorAll(`[data-asset="${key}"]`).forEach(a => a.href = url);
+    set("mac-arm", asset(mac, "Astro-Rig-Monitor-Apple-Silicon.zip"));
+    set("mac-intel", asset(mac, "Astro-Rig-Monitor-Intel.zip"));
+    set("win", asset(win, "Astro-Rig-Monitor-Setup.exe"));
+    const v = [mac && "Mac " + mac.tag_name.slice(5), win && "Windows " + win.tag_name.slice(5), mon && "monitor " + mon.tag_name.slice(1)].filter(Boolean);
+    if (v.length) document.getElementById("ver").textContent = "Newest: " + v.join(", ") + ".";
+  } catch (e) { /* keep the links in the page */ }
+})();
+
+// Top buttons: jump to this computer's card, and show its button first.
+(() => {
+  const ua = navigator.userAgent;
+  const os = /Mac OS X|Macintosh/.test(ua) && !/iPhone|iPad/.test(ua) ? "mac" : /Windows/.test(ua) ? "win" : /Linux|X11/.test(ua) && !/Android/.test(ua) ? "pi" : null;
+  const box = document.getElementById("dl");
+  box.querySelectorAll("a").forEach(a => { a.href = "#" + a.dataset.os; });
+  if (os) {
+    box.querySelectorAll("a").forEach(a => a.classList.toggle("primary", a.dataset.os === os));
+    box.prepend(box.querySelector(`[data-os="${os}"]`));
+  }
+})();
+
+document.getElementById("copy").addEventListener("click", async e => {
+  try { await navigator.clipboard.writeText(document.getElementById("cmd").textContent); e.target.textContent = "Copied"; }
+  catch (err) { e.target.textContent = "Select and copy the line above"; }
+});
+</script>
+</body>
+</html>
