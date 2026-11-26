@@ -109,7 +109,7 @@ build_one() {
   echo "[$label] built $out/Astro Rig Monitor.app and $zip ($(du -sh "$zip" | cut -f1))"
 }
 
-archs=(${@:-arm64 x86_64})
+if (( $# )); then archs=($@); else archs=(arm64 x86_64); fi
 for a in $archs; do
   [[ -n ${LABEL[$a]:-} ]] || { echo "unknown architecture $a (use arm64 or x86_64)"; exit 2; }
   build_one $a
