@@ -11,7 +11,7 @@ The monitor already serves a full web page (`http://<computer>:8080`). This guid
 | A tablet, old phone or spare screen showing the rigs | The built-in page, full screen ([below](#1-the-built-in-page-on-a-spare-screen)) | None |
 | Your own web page or dashboard | `/events` or `/state.json` from the monitor's web server ([below](#2-your-own-web-page)) | HTML + JavaScript, starting from [`examples/web-display.html`](../examples/web-display.html) |
 | A small window on your Windows, Mac or Linux desktop | `/events` ([below](#3-a-desktop-window)) | Python, starting from [`examples/desktop_display.py`](../examples/desktop_display.py) |
-| A microcontroller (ESP32 etc.) with a screen, LEDs or a buzzer | MQTT ([below](#4-a-microcontroller-over-mqtt)) | Arduino / ESP-IDF / MicroPython |
+| A microcontroller (ESP32 etc.) with a screen, LEDs or a buzzer | MQTT ([below](#4-a-microcontroller-over-mqtt)) | None for the Guition JC3248W535 ([ready-made firmware](../esp32/README.md)); otherwise Arduino / ESP-IDF / MicroPython |
 | Home Assistant | MQTT ([below](#5-home-assistant)) | A few lines of YAML |
 
 Routes 1–3 need only the `[web]` section in `config.toml` (on by default). Routes 4–5 also need an MQTT broker and an `[mqtt]` section.
@@ -171,7 +171,7 @@ mosquitto_sub -h 192.168.1.20 -t 'arm/#' -v
 - **One LED for every rig** works well: the worst rig decides (off when all OK or idle, solid on any warning, flashing on any alert). A second LED can show the display's own health (monitor lost, WiFi down, low battery).
 - **Pick rows when you have more rigs than room:** show armed rigs and rigs at WARN or ALERT first, then the most recently active.
 
-The screenshots in the [README](../README.md#screenshots) show one such display (a 3.5″ 480×320 ESP32-S3 touch screen with LVGL); its firmware isn't part of this repository, but the layout is a good model: one row per rig with a colour stripe, name, state, total RMS, RA/Dec and a sparkline, and a detail screen with the guide graph and a Disarm button.
+**Ready-made firmware:** [`esp32/`](../esp32/README.md) has complete firmware for the Guition JC3248W535 (a 3.5″ ESP32-S3 touch screen): overview rows, guide graph, sky picture, two LEDs, power saving and updates over WiFi. Use it as it is, or as a model for another board.
 
 **MicroPython** works too: `umqtt.simple` plus `json`, with the same topics and rules.
 

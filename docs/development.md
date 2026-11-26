@@ -20,6 +20,7 @@
 | `tools/replay.py` | Runs a recording or a scenario through the logic offline, with CSV output |
 | `tools/night_report.py` | Builds a night report by hand |
 | `arm/tracker.py` | Trackers without guiding: reads the controller's status page |
+| `esp32/` | Firmware for the ESP32 desk display (Arduino, LVGL) and its WiFi update script |
 | `examples/` | Starting points for your own display: a web page and a desktop window (see [build-a-display.md](build-a-display.md)) |
 
 ## Tests

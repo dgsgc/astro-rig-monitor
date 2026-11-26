@@ -29,7 +29,7 @@ The detail page has the last 100 frames (dithers shaded), the stats, and the all
 <img src="docs/screenshots/phone-sqa55-detail.png" width="30%" alt="A rig in WARNING on a phone">
 </p>
 
-**Desk display (optional, over MQTT).** These show an ESP32 touch-screen display. Its firmware isn't part of this repository; [Build your own display](docs/build-a-display.md) explains how to make one, and the [message spec](docs/mqtt-spec.md) is what it reads. The images are mock-ups built from the display's own layout:
+**Desk display (optional, over MQTT).** An ESP32 touch-screen display; its firmware is in [`esp32/`](esp32/README.md), ready to build for a Guition JC3248W535 board. The images are mock-ups built from the display's own layout:
 - The overview, with one row per rig. Its LED is off when everything's fine, solid on a warning and flashing on an alert.
 - A rig's guide graph.
 - The sky camera, which the display shows first when cloud could be the cause.

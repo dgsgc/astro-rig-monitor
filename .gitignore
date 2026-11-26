@@ -12,3 +12,8 @@ config.local.*
 nights/
 reports/
 guide_logs/
+
+# Display firmware: your own settings and secrets stay local
+esp32/arm_display/secrets.h
+esp32/arm_display/config_local.h
+esp32/build/
