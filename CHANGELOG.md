@@ -15,6 +15,7 @@ The Mac app is updated to `mac-v0.1.1` with these changes.
 
 **Fixed**
 - The fake rig's ASIAIR mode introduced itself as PHD2 and answered PHD2's question, so setup took it for PHD2. It now introduces itself like a real ASIAIR and answers nothing.
+- Pi and Linux installer: if GitHub turns away its lookup of the newest release (it limits anonymous lookups, which busy shared networks can hit), it reads the latest-release page instead.
 - Windows: the background task now gets the account name from Windows, so it can also be set up from an SSH session (where `USERDOMAIN` is `WORKGROUP`).
 
 ## 0.3.0 (26 November 2026)

@@ -71,10 +71,16 @@ if [[ -n "$FROM" ]]; then
     version="$(cd "$src" && python3 -c 'import arm; print(arm.__version__)')"
 else
     say "Finding the newest release..."
-    tag="$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=30" | python3 -c '
+    # GitHub's API limits anonymous lookups (shared networks hit it), so fall back to the
+    # "latest release" page, which the monitor's releases keep (the app releases are never "latest").
+    tag="$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=30" 2>/dev/null | python3 -c '
 import json, sys
 tags = [r["tag_name"] for r in json.load(sys.stdin) if not r.get("draft") and not r.get("prerelease")]
-print(next(t for t in tags if t.startswith("v")))')" || die "couldn't reach GitHub to find the newest release."
+print(next(t for t in tags if t.startswith("v")))' 2>/dev/null)" || tag=""
+    if [[ -z "$tag" ]]; then
+        tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" | sed -n 's#.*/releases/tag/##p')"
+        [[ "$tag" == v* ]] || die "couldn't reach GitHub to find the newest release."
+    fi
     version="${tag#v}"
     say "Downloading Astro Rig Monitor $version..."
     curl -fsSL "https://github.com/$REPO/archive/refs/tags/$tag.tar.gz" | tar -xz -C "$work"
