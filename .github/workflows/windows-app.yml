@@ -1,0 +1,22 @@
+name: windows app
+on:
+  push:
+    paths: ["windows/**", "arm/**", "requirements.txt", ".github/workflows/windows-app.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # the build number is the commit count
+      - name: Build the installer
+        shell: pwsh
+        run: windows\build.ps1
+      - name: Install, run, update-restart, stop and uninstall it
+        shell: pwsh
+        run: windows\test_install.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Astro-Rig-Monitor-Setup
+          path: windows/build/Astro-Rig-Monitor-Setup.exe

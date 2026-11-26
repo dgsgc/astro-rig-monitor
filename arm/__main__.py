@@ -134,6 +134,9 @@ def main(argv=None):
         out.close()
     if restart.is_set():
         logging.shutdown()
+        code = os.environ.get("ARM_RESTART_EXIT")      # run by a supervisor (the Windows app): it restarts us
+        if code:
+            sys.exit(int(code))
         os.execv(sys.executable, [sys.executable, "-m", "arm", *argv])
 
 
