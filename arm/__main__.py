@@ -71,7 +71,8 @@ def main(argv=None):
     if cfg.web.enabled:
         hub = WebHub({r.id: r.name or r.id for r in cfg.rigs})
         try:
-            web = WebServer(hub, cfg.web.host, cfg.web.port, stop, rep.reports_dir if rep.enabled else None)
+            web = WebServer(hub, cfg.web.host, cfg.web.port, stop, rep.reports_dir if rep.enabled else None,
+                            allow_origin=cfg.web.allow_origin)
             web.start()
             listeners.append(hub)
         except OSError as e:        # port in use etc.: alerting matters more than the page

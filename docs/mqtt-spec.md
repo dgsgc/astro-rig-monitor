@@ -1,8 +1,10 @@
 # MQTT message spec (v1)
 
-How the Astro Rig Monitor and displays (an ESP32 screen, Home Assistant, anything that speaks MQTT) talk through an MQTT broker such as Mosquitto. Only needed with an `[mqtt]` section: the web page and phone alerts work without it.
+How the Astro Rig Monitor and displays (an ESP32 screen, Home Assistant, anything that speaks MQTT) talk through an MQTT broker such as Mosquitto. Only needed with an `[mqtt]` section: the web page and phone alerts work without it. The same messages are also on the web server's `/events` and `/state.json`; [build-a-display.md](build-a-display.md) is the how-to guide.
 
-**The bridge makes the decisions; displays only draw them.** The bridge decides each rig's level (OK / WARN / ALERT / IDLE) and why. The ESP32 shows that and drives the LEDs. Only two things are left to the ESP32: noticing that the bridge has gone silent, and noticing that a rig's data has gone stale. A dead bridge can't report itself.
+In this spec, *bridge* means the monitor (the program that reads the rigs and publishes these messages).
+
+**The bridge makes the decisions; displays only draw them.** The bridge decides each rig's level (OK / WARN / ALERT / IDLE) and why. The display shows that and drives any LEDs. Only two things are left to the display: noticing that the bridge has gone silent, and noticing that a rig's data has gone stale. A dead bridge can't report itself.
 
 ## General rules
 
@@ -12,7 +14,7 @@ How the Astro Rig Monitor and displays (an ESP32 screen, Home Assistant, anythin
 - **Units:** angles in arcseconds, durations in seconds, timestamps as Unix seconds (UTC, bridge clock). Values are rounded to 2 decimal places.
 - **No data is `null`, never `0`.** `0.0` would read as perfect guiding.
 - **Every JSON payload carries `"v": 1`.** A display that sees a higher major version shows "update needed" and doesn't guess.
-- **Size:** the largest message (`history`) is about 2–3 KB. The ESP32's MQTT client buffer must be at least 4 KB; PubSubClient's default of 256 bytes is too small.
+- **Size:** the largest message (`history`) is about 2–3 KB. A display's MQTT client buffer must be at least 4 KB (more for the sky images, up to 40 KB); PubSubClient's default of 256 bytes is too small.
 
 ## Topics
 
@@ -31,7 +33,7 @@ How the Astro Rig Monitor and displays (an ESP32 screen, Home Assistant, anythin
 | `arm/display/<display>/status` | display | yes | `online` / `offline` (last-will) |
 | `arm/display/<display>/info` | display | yes | every 5 min: battery, firmware, signal |
 
-`<bridge>` defaults to `main`. A second bridge (for example a script on the South Africa PC, if Tailscale isn't possible) would use its own ID.
+`<bridge>` defaults to `main`. A second bridge (for example one at a remote observatory that can't be reached over a VPN) would use its own ID (`bridge_id` in its `config.toml`).
 
 ### `arm/bridge/<bridge>/heartbeat`
 
@@ -77,13 +79,13 @@ The main message, enough to draw a rig's row on the overview and the text on the
 |---|---|
 | `link` | Bridge ↔ rig connection: `up`, `down` (can't connect), or `quiet` (connected but nothing received for a while) |
 | `state` | What the rig is doing: `guiding`, `dithering`, `settling`, `star_lost`, `stopped`, `looping`, `calibrating`, `busy` (a known task, see `task`), `idle`, `unknown` |
-| `task` | When known: `calibration`, `Paused by NINA` or `Paused by plan` (a PHD2 or ASIAIR rig with `planned_stop_grace_s`: NINA or the ASIAIR plan stopped guiding for a goto, target change, autofocus or flip); otherwise `null`. Depends on what the rig reports (to be confirmed from the logs) |
+| `task` | When known: `calibration`, `Paused by NINA` or `Paused by plan` (a PHD2 or ASIAIR rig with `planned_stop_grace_s`: NINA or the ASIAIR plan stopped guiding for a goto, target change, autofocus or flip); otherwise `null` |
 | `level` | `ok`, `warn`, `alert`, or `idle` (grey: not imaging, or disarmed) |
 | `reason` | Code for warn/alert: `rms_high`, `star_lost`, `stopped`, `settle_failed`, `task_too_long`, `rig_offline`, `data_stale`, `asiair_health` (only with `app_port`: the ASIAIR reports under-voltage, overheating or over-current) |
 | `reason_text` | Short label for the screen (≤ 20 characters), e.g. `"Star lost"`. The display adds the elapsed time from `since`, so it can count up between messages |
 | `since` | When the current `level` + `reason` began |
 | `armed` / `acked` | See *Arming and acknowledging* below |
-| `screen` | ASIAIR-matching figures for display: same formula and window as the ASIAIR guide graph, dithers included (unless the rig sets `screen_dithers = false`, as the NINA rig does). `null` when there's no data |
+| `screen` | ASIAIR-matching figures for display: same formula and window as the ASIAIR guide graph, dithers included (unless the rig sets `screen_dithers = false`, as suits NINA's large dithers). `null` when there's no data |
 | `alert_total` | The dither-free total RMS the level is based on |
 | `last_good_total` | Last `alert_total` before the data stopped, for "Last good 0.71″" |
 | `thresholds` | This rig's bands, so the display can draw the dashed lines |

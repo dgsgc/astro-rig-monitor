@@ -19,6 +19,8 @@
 | `tools/guide_logger.py` | Records a rig's raw stream to a file (read-only) |
 | `tools/replay.py` | Runs a recording or a scenario through the logic offline, with CSV output |
 | `tools/night_report.py` | Builds a night report by hand |
+| `arm/tracker.py` | Trackers without guiding: reads the controller's status page |
+| `examples/` | Starting points for your own display: a web page and a desktop window (see [build-a-display.md](build-a-display.md)) |
 
 ## Tests
 

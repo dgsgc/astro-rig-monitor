@@ -1,0 +1,126 @@
+<!doctype html>
+<!--
+  A minimal display page for Astro Rig Monitor: one coloured row per rig.
+
+  It's a starting point for your own design. Everything it needs comes from the monitor's
+  read-only /events stream (see docs/build-a-display.md).
+
+  Use it either way:
+  - Open this file in a browser and type the monitor's address (e.g. http://192.168.1.20:8080).
+    The monitor needs   allow_origin = "*"   under [web] in config.toml for that.
+  - Or open it as http://...?monitor=http://192.168.1.20:8080 to skip the box.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rig display</title>
+<style>
+  :root { --bg:#111; --row:#1c1c1c; --text:#eee; --dim:#888;
+          --ok:#5a9e2f; --warn:#e9a23b; --alert:#e2483d; --idle:#555; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px system-ui, sans-serif; }
+  header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; color: var(--dim); font-size: 13px; }
+  header input { flex: 1; max-width: 320px; background: #222; color: var(--text); border: 1px solid #333; padding: 4px 6px; }
+  #bridge.bad { color: var(--alert); font-weight: 600; }
+  .row { display: grid; grid-template-columns: 8px 1fr auto; gap: 12px; align-items: center;
+         margin: 6px 12px; padding: 10px 12px 10px 0; background: var(--row); border-radius: 4px; }
+  .stripe { align-self: stretch; border-radius: 4px 0 0 4px; }
+  .name { font-size: 20px; }
+  .what { font-size: 13px; color: var(--dim); }
+  .big { font-size: 30px; font-variant-numeric: tabular-nums; text-align: right; }
+  .sub { font-size: 12px; color: var(--dim); text-align: right; }
+  .alert .big { color: var(--alert); }
+  .flash .stripe { animation: flash 1s steps(1) infinite; }
+  @keyframes flash { 50% { opacity: .15; } }
+</style>
+</head>
+<body>
+<header>
+  <span id="bridge">Not connected</span>
+  <input id="url" placeholder="Monitor address, e.g. http://192.168.1.20:8080">
+  <button id="go">Connect</button>
+</header>
+<main id="rigs"></main>
+
+<script>
+const COLOURS = { ok: "var(--ok)", warn: "var(--warn)", alert: "var(--alert)", idle: "var(--idle)" };
+const STALE_S = 30;              // no heartbeat / state for this long = treat as lost (see the MQTT spec)
+let rigs = [];                   // [{id, name}] in the monitor's order
+const state = {};                // rig id -> latest state message
+let heartbeatAt = 0, source = null, skew = 0;
+
+const now = () => Date.now() / 1000 - skew;      // the monitor's clock, so ages are right
+const ago = ts => {
+  const s = Math.max(0, Math.round(now() - ts));
+  return s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
+};
+
+function connect(base) {
+  base = base.replace(/\/+$/, "");
+  if (source) source.close();
+  source = new EventSource(base + "/events");      // reconnects by itself if the monitor restarts
+  source.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.t === "hello") rigs = m.rigs;
+    else if (m.t === "heartbeat") { heartbeatAt = Date.now() / 1000; skew = Date.now() / 1000 - m.d.ts; }
+    else if (m.t === "state") state[m.rig] = m.d;
+    draw();
+  };
+  source.onerror = () => draw();
+  try { localStorage.setItem("monitor", base); } catch (e) {}
+}
+
+function rowFor(r) {
+  const s = state[r.id];
+  const bridgeOk = Date.now() / 1000 - heartbeatAt < STALE_S;
+  let level = s ? s.level : "idle", what = "No data", big = "--", sub = "";
+  if (s) {
+    const stale = now() - s.ts > STALE_S;
+    if (!bridgeOk || stale) {
+      // The monitor can't tell you it's gone: an armed rig you can no longer see is an alert.
+      level = s.armed ? "alert" : "idle";
+      what = bridgeOk ? "Data stale" : "No monitor";
+    } else {
+      what = s.reason_text || (s.task ? s.task : s.state.replace("_", " "));
+      if (s.since && s.level !== "idle") what += ` · ${ago(s.since)}`;
+    }
+    if (s.kind === "tracker" && s.tracker) {           // a tracker without guiding: frames, not RMS
+      big = `${s.tracker.frame} / ${s.tracker.total}`;
+      sub = s.tracker.star_size != null ? `stars ${s.tracker.star_size}″, ${s.tracker.stars} found` : "";
+    } else if (s.screen) {
+      big = `${s.screen.total.toFixed(2)}″`;
+      sub = `RA ${s.screen.ra.toFixed(2)}  Dec ${s.screen.dec.toFixed(2)}`;
+    }
+  }
+  const div = document.createElement("div");
+  div.className = `row ${level}` + (level === "alert" ? " flash" : "");
+  div.innerHTML = `<div class="stripe"></div>
+    <div><div class="name"></div><div class="what"></div></div>
+    <div><div class="big"></div><div class="sub"></div></div>`;
+  div.querySelector(".stripe").style.background = COLOURS[level] || COLOURS.idle;
+  div.querySelector(".name").textContent = r.name;      // textContent: names are never treated as HTML
+  div.querySelector(".what").textContent = what;
+  div.querySelector(".big").textContent = big;
+  div.querySelector(".sub").textContent = sub;
+  return div;
+}
+
+function draw() {
+  const ok = Date.now() / 1000 - heartbeatAt < STALE_S;
+  const b = document.getElementById("bridge");
+  b.textContent = heartbeatAt ? (ok ? "Monitor live" : "Monitor lost") : "Connecting…";
+  b.className = heartbeatAt && !ok ? "bad" : "";
+  document.getElementById("rigs").replaceChildren(...rigs.map(rowFor));
+}
+setInterval(draw, 1000);         // keeps ages counting and notices a silent monitor
+
+const input = document.getElementById("url");
+let start = new URLSearchParams(location.search).get("monitor");
+try { start = start || localStorage.getItem("monitor"); } catch (e) {}
+if (!start && location.protocol.startsWith("http")) start = location.origin;
+if (start) { input.value = start; connect(start); }
+document.getElementById("go").onclick = () => connect(input.value);
+</script>
+</body>
+</html>

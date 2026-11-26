@@ -5,7 +5,7 @@ Keeps an eye on your telescope's autoguiding so you don't have to. It reads the 
 - **Web page** for your phone, tablet or desktop: every rig at a glance, a detail view with the guide graph, and a night-mode red screen.
 - **Phone alerts** through the free [ntfy](https://ntfy.sh) app or a Discord channel.
 - **Night reports:** each morning, a one-page summary of last night's guiding per rig: RMS through the night, alerts, dithers, and why the plan paused (meridian flip, new target, autofocus, cloud).
-- **Optional MQTT** output for a small desk display (ESP32) or Home Assistant ([message spec](docs/mqtt-spec.md)).
+- **Build your own display:** a tablet or Raspberry Pi screen in kiosk mode, your own web page, a desktop window, an ESP32 with LEDs, or Home Assistant. A [step-by-step guide](docs/build-a-display.md) and working examples are included.
 
 **It is read-only.** It only listens to the guiding events the ASIAIR or PHD2 already broadcast on port 4400. It never sends a command to a rig, so it can't disturb a running session. ASIAIR users can optionally let it listen to the app's own port too, for autofocus, filter changes and plan progress ([details](docs/configuration.md#the-asiair-app-port-optional); unofficial, so a future firmware could change it).
 
@@ -29,7 +29,7 @@ The detail page has the last 100 frames (dithers shaded), the stats, and the all
 <img src="docs/screenshots/phone-sqa55-detail.png" width="30%" alt="A rig in WARNING on a phone">
 </p>
 
-**Desk display (optional, over MQTT).** These show an ESP32 touch-screen display. Its firmware isn't part of this repository; the [message spec](docs/mqtt-spec.md) is what it reads. The images are mock-ups built from the display's own layout:
+**Desk display (optional, over MQTT).** These show an ESP32 touch-screen display. Its firmware isn't part of this repository; [Build your own display](docs/build-a-display.md) explains how to make one, and the [message spec](docs/mqtt-spec.md) is what it reads. The images are mock-ups built from the display's own layout:
 - The overview, with one row per rig. Its LED is off when everything's fine, solid on a warning and flashing on an alert.
 - A rig's guide graph.
 - The sky camera, which the display shows first when cloud could be the cause.
@@ -57,12 +57,14 @@ One bad frame never alerts, dithers and settling are left out of the alert figur
 - A computer that stays on through the night, on the same network as the rigs: a Raspberry Pi, a Mac, a Windows PC or a Linux box. It uses very little CPU.
 - Python 3.11 or later.
 - Rigs running an **ASIAIR** (any model) or **PHD2** 2.6 or later with its event server on (PHD2: *Tools → Enable Server*, on by default). Give each ASIAIR a fixed address on your router (a DHCP reservation).
+- Optional: a tracker without guiding whose controller serves a JSON status page ([details](docs/configuration.md#trackers-without-guiding)).
+- Optional: an MQTT broker such as Mosquitto, only for a microcontroller display or Home Assistant.
 - A remote observatory works too, over [Tailscale](https://tailscale.com) or another VPN. Don't open port 4400 to the internet.
 
 ## Quick start
 
 ```bash
-git clone https://github.com/<you>/astro-rig-monitor.git
+git clone https://github.com/dgsgc/astro-rig-monitor.git
 cd astro-rig-monitor
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt          # Windows: .venv\Scripts\pip install -r requirements.txt
@@ -70,7 +72,7 @@ python3 -m venv .venv
 .venv/bin/python -m arm                        # run it; Ctrl+C to stop
 ```
 
-Then open `http://<that computer's address>:8080` on your phone.
+Then open `http://<that computer's address>:8080` on your phone. On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`.
 
 `setup` listens to each rig for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Run it while the rig is guiding and there's almost nothing to answer. It never sends anything to the rig.
 
@@ -101,7 +103,8 @@ The figure on the web page is meant to match what your ASIAIR or NINA shows; see
 ## Documentation
 
 - [Configuration](docs/configuration.md): every setting, ASIAIR / PHD2 / NINA notes, alerts, night reports, the web page.
-- [MQTT message spec](docs/mqtt-spec.md): for building a display or a Home Assistant integration.
+- [Build your own display](docs/build-a-display.md): kiosk screens, your own web page, a desktop window, ESP32 over MQTT, Home Assistant.
+- [MQTT message spec](docs/mqtt-spec.md): every message and field, for displays and integrations.
 - [Development](docs/development.md): tests, a fake rig for testing without a telescope, replaying a logged night.
 
 ## Licence

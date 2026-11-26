@@ -3,6 +3,7 @@
 The bridge serves it itself (Python's standard library, no extra packages):
   /             the page (bridge/web_static/index.html)
   /events       Server-Sent Events: the same messages the bridge publishes over MQTT
+  /state.json   one snapshot of the latest messages, for displays that would rather poll
   /sky/<rig>.jpg  the latest all-sky image for a rig (small, as sent to the display)
   /sky/large/<rig>.jpg  the same image, large
 
@@ -79,6 +80,20 @@ class WebHub:
                 msgs.append({"t": "sky", "rig": rid, "at": round(at)})
         return msgs
 
+    def snapshot(self) -> dict:
+        """The latest of everything as one JSON object (GET /state.json)."""
+        with self.lock:
+            rigs = []
+            for rid, name in self.rigs.items():
+                r = {"id": rid, "name": name}
+                for kind in KINDS_KEPT:
+                    r[kind] = self.latest.get((rid, kind))
+                got = self.sky.get(rid)
+                r["sky_at"] = round(got[1]) if got else None
+                rigs.append(r)
+            return {"v": 1, "version": __version__, "ts": round(time.time()),
+                    "heartbeat": self.heartbeat, "rigs": rigs}
+
     def sky_image(self, rid: str) -> Optional[bytes]:
         with self.lock:
             got = self.sky.get(rid)
@@ -151,7 +166,7 @@ class Tee:
         self.out.close()
 
 
-def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str]):
+def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str], allow_origin: str = ""):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"astro-rig-monitor/{__version__}"
         protocol_version = "HTTP/1.1"
@@ -165,9 +180,14 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str]):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", cache)
             self.send_header("X-Content-Type-Options", "nosniff")
+            self._cors()
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(body)
+
+        def _cors(self):
+            if allow_origin:        # off by default: only pages this server serves can read the data
+                self.send_header("Access-Control-Allow-Origin", allow_origin)
 
         def do_HEAD(self):
             self.do_GET()
@@ -182,6 +202,8 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str]):
                 return self._static("icon.svg", "image/svg+xml", cache="max-age=86400")
             if path == "/events":
                 return self._events()
+            if path == "/state.json":
+                return self._body(200, "application/json", json.dumps(hub.snapshot()).encode())
             if path == "/reports.json":
                 items = [dict(r, label=night_label(r["night"])) for r in report_files(reports_dir)] if reports_dir else []
                 return self._body(200, "application/json", json.dumps(items[:14]).encode())
@@ -221,6 +243,7 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str]):
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("X-Accel-Buffering", "no")
+                self._cors()
                 self.end_headers()
                 for msg in hub.hello():
                     self.wfile.write(f"data: {json.dumps(msg, separators=(',', ':'))}\n\n".encode())
@@ -250,10 +273,11 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str]):
 
 
 class WebServer(threading.Thread):
-    def __init__(self, hub: WebHub, host: str, port: int, stop: threading.Event, reports_dir: Optional[str] = None):
+    def __init__(self, hub: WebHub, host: str, port: int, stop: threading.Event, reports_dir: Optional[str] = None,
+                 allow_origin: str = ""):
         super().__init__(name="web", daemon=True)
         self.stop_event = stop
-        self.httpd = ThreadingHTTPServer((host, port), _handler(hub, stop, reports_dir))
+        self.httpd = ThreadingHTTPServer((host, port), _handler(hub, stop, reports_dir, allow_origin))
         self.httpd.daemon_threads = True
         self.host, self.port = host, self.httpd.server_address[1]
 

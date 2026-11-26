@@ -28,6 +28,7 @@ class WebSettings:
     enabled: bool = False
     host: str = "0.0.0.0"       # all interfaces: LAN and Tailscale. "127.0.0.1" = this computer only
     port: int = 8080
+    allow_origin: str = ""      # e.g. "*": lets a page served from elsewhere read /events and /state.json
 
 
 @dataclass

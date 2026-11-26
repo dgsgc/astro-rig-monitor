@@ -950,6 +950,30 @@ class Web(unittest.TestCase):
             stop.set()
             srv.close()
 
+    def test_state_json_and_cross_origin(self):
+        import threading
+        import urllib.request
+        from arm.web import WebServer
+        for origin in ("", "*"):
+            hub, stop = self.hub(), threading.Event()
+            hub.publish("bridge/main/heartbeat", {"v": 1, "ts": T0})
+            hub.publish("rig/102ed/state", {"v": 1, "level": "warn"})
+            hub.publish("rig/102ed/frame", {"n": 1})
+            srv = WebServer(hub, "127.0.0.1", 0, stop, allow_origin=origin)
+            srv.start()
+            try:
+                r = urllib.request.urlopen(f"http://127.0.0.1:{srv.port}/state.json", timeout=5)
+                self.assertEqual(r.headers["Access-Control-Allow-Origin"], origin or None)
+                d = json.loads(r.read())
+                self.assertEqual(d["heartbeat"], {"v": 1, "ts": T0})
+                self.assertEqual([x["id"] for x in d["rigs"]], ["102ed", "sqa55"])
+                self.assertEqual(d["rigs"][0]["state"], {"v": 1, "level": "warn"})
+                self.assertIsNone(d["rigs"][1]["state"])
+                self.assertNotIn("frame", d["rigs"][0])
+            finally:
+                stop.set()
+                srv.close()
+
     def test_web_config(self):
         with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as f:
             f.write('[web]\nport = 8099\n\n[rigs.a]\nhost = "x"\n')

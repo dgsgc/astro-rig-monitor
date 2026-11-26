@@ -6,7 +6,7 @@ Everything lives in `config.toml`. `python -m arm setup` writes one for you; [`c
 
 | Section | Turns on | Notes |
 |---|---|---|
-| `[web]` | The web page | `port` (8080), `host` ("0.0.0.0" = whole home network, "127.0.0.1" = this computer only) |
+| `[web]` | The web page | `port` (8080), `host` ("0.0.0.0" = whole home network, "127.0.0.1" = this computer only), `allow_origin` (off; `"*"` lets your own page elsewhere read the data, see [build-a-display.md](build-a-display.md#2-your-own-web-page)) |
 | `[report]` | Night recording and the morning report | `at` ("08:00", local time), `keep_days` (30), `nights_dir`, `reports_dir` |
 | `[notify]` | Phone / chat alerts | See [Notifications](#notifications) |
 | `[mqtt]` | Publishing to an MQTT broker | `host`, `port`, `username`, `password`, `tls`, `ca_file`, `prefix` ("arm": every topic starts with it). See [mqtt-spec.md](mqtt-spec.md) |
@@ -153,6 +153,7 @@ ntfy_url = "https://ntfy.sh/arm-a-long-random-name"
 - **It notices stale data itself:** if it loses the program, it shows a red banner, and rigs that were armed show as alerts.
 - **Night** turns the page red. **Keep on** stops a phone or tablet sleeping (in browsers that support it). On iOS, *Share → Add to Home Screen* opens it full screen like an app.
 - Up to 20 viewers at once, a few KB/s each.
+- **Your own display:** the page's data is also at `/events` (live) and `/state.json` (a snapshot) for a page, desktop window or script of your own. See [Build your own display](build-a-display.md).
 
 ## Night reports
 
