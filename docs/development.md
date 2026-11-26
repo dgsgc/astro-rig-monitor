@@ -59,5 +59,5 @@ Any rig setting can be overridden in the replay to try alternatives, e.g. `--scr
 
 1. Bump `arm/__init__.py` (the monitor), and `mac/VERSION` / `windows/VERSION` for app changes; add a `CHANGELOG.md` entry.
 2. Tag `v…` (the monitor, marked **Latest**: the Pi installer falls back to the latest-release page), `mac-v…` and `win-v…` (never marked Latest). The Mac zips come from `mac/build.sh`, the Windows installer from the `windows app` workflow's artifact on `main`.
-3. **Update the direct download links in the README's Install table** to the new `mac-v…` / `win-v…` tags.
+3. **Update the direct download links** to the new `mac-v…` / `win-v…` tags: the README's Install table, `mac/README.md` and `windows/README.md`.
 
