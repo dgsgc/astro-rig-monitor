@@ -1,9 +1,11 @@
 # Changes
 
-## Unreleased
+## 0.3.2 (26 November 2026)
+
+With Mac app `mac-v0.1.2` and Windows app `win-v0.1.1`.
 
 **Changed**
-- **The apps open the setup page in a window of their own** instead of a browser tab: the Mac app in its own window (Mac app 0.1.2), the Windows app in an Edge window without tabs or an address bar (Windows app 0.1.1; your usual browser if Edge isn't there). It's the same setup page; after **Save and start** the window shows the monitor's page. Links to other sites open in your browser.
+- **The apps open the setup page in a window of their own** instead of a browser tab: the Mac app in its own window, the Windows app in an Edge window without tabs or an address bar (your usual browser if Edge isn't there). It's the same setup page; after **Save and start** the window shows the monitor's page. Links to other sites open in your browser.
 
 **Fixed**
 - `python -m arm` with no settings yet no longer starts its setup page on a port another program already uses (macOS allowed it to share the port with a monitor that was already running); it says so instead.
