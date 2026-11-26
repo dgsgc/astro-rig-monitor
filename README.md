@@ -79,7 +79,7 @@ Each way runs the same monitor, with the same settings file, web page, alerts an
 2. **Unzip it and drag Astro Rig Monitor into Applications.** The first time, right-click it and choose **Open**, then **Open** again (it isn't notarised by Apple).
 3. **Set up:** the setup window opens by itself. Add your rigs and press **Save and start** ([details](#setting-up-your-rigs)). When macOS asks, allow the background item and access to your local network.
 
-It lives in the menu bar (the telescope icon), starts at login and keeps the Mac awake while it runs. **To update:** choose Quit in its menu, replace the app in Applications with the new one, and open it. More in [mac/README.md](mac/README.md).
+It lives in the menu bar (the crosshair icon), starts at login and keeps the Mac awake while it runs. **To update:** choose Quit in its menu, replace the app in Applications with the new one, and open it. More in [mac/README.md](mac/README.md).
 
 ### Windows
 
