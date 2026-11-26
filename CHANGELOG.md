@@ -1,10 +1,13 @@
 # Changes
 
-## Unreleased
+## 0.3.0 (26 November 2026)
 
 **New**
-- **Mac app** (`mac/`, released separately as `mac-v…`): Astro Rig Monitor as a menu-bar app with its own Python, for Apple Silicon and Intel. It runs the monitor in the background from login and opens the setup page the first time. Its menu has the status, the phone address, the setup page, a test notification, the log and updates. Built with `mac/build.sh` ([mac/README.md](mac/README.md)).
+- **Mac app** (`mac/`, released separately as `mac-v0.1.0`): Astro Rig Monitor as a menu-bar app with its own Python, for Apple Silicon and Intel. It runs the monitor in the background from login and opens the setup page the first time. Its menu has the status, the page in your browser or on your phone (with a QR code), the setup page, a test notification, the log and updates. Built with `mac/build.sh` ([mac/README.md](mac/README.md)).
 - **Setup page:** start the monitor without a `config.toml` and it serves a setup page at `http://localhost:8080/setup` instead: add rigs (with the same listen to detect their settings, which now also asks PHD2 once for its guide scale, a read-only question, so it doesn't have to be typed in), an optional all-sky camera per rig with a Check button that shows the picture (Dropbox share links are made direct), phone alerts with a test button, site position, reports and MQTT. Saving starts the monitor. Later, the web page links to it on the monitor's own computer to add rigs or start again; the monitor restarts itself with the new file. Only the monitor's own computer can use it unless you pass `--setup-from-lan` (first run) or set `[web] setup_from_lan = true`. `python -m arm setup` still works.
+- **Fake rig** (`tools/fake_rig.py`) answers `get_pixel_scale` like PHD2 (`--pixel-scale`).
+
+**Upgrading from 0.2.0:** pull, then run the service installer again. `config.toml` needs no changes. To move to the Mac app instead, see [mac/README.md](mac/README.md#coming-from-the-terminal-install).
 
 ## 0.2.0 (26 November 2026)
 
