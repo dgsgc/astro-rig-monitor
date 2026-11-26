@@ -171,6 +171,20 @@ class SetupPage(unittest.TestCase):
                          "https://www.dropbox.com/scl/fi/abc/image.jpg?rlkey=k&raw=1")
 
 
+class NetworkHint(unittest.TestCase):
+    def test_hint_only_for_a_refused_local_network_on_a_mac(self):
+        from arm import setup_web
+        real = setup_web.sys.platform
+        try:
+            setup_web.sys.platform = "darwin"
+            self.assertIn("Local Network", setup_web.network_hint("couldn't fetch it ([Errno 65] No route to host)"))
+            self.assertEqual(setup_web.network_hint("nothing at that address (404)"), "")
+            setup_web.sys.platform = "linux"
+            self.assertEqual(setup_web.network_hint("No route to host"), "")
+        finally:
+            setup_web.sys.platform = real
+
+
 class Sky(unittest.TestCase):
     def test_clean_url(self):
         from arm.sky import clean_url

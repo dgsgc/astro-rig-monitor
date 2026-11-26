@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import secrets
+import sys
 import threading
 import time
 from typing import Callable, Dict, Optional
@@ -37,6 +38,15 @@ LOCAL_NAMES = {"localhost", "127.0.0.1", "::1"}
 MAX_BODY = 64 * 1024
 MAX_PROBES = 4
 HOST_RE = re.compile(r"[A-Za-z0-9.:_\-\[\]]+")
+
+
+def network_hint(error: str) -> str:
+    """macOS refuses an app's first connections to the local network ("No route to host") while
+    it asks the user whether to allow them; say so, as the error alone doesn't."""
+    if sys.platform == "darwin" and ("No route to host" in error or "Errno 65" in error):
+        return (". If macOS asked whether Astro Rig Monitor may find devices on your local network, "
+                "click Allow and try again (or turn it on in System Settings → Privacy & Security → Local Network)")
+    return ""
 
 
 class SetupService:
@@ -178,6 +188,8 @@ class SetupService:
                 found = self.probe(host, port, say=lambda *_: None)
             except Exception as e:
                 found = {"error": str(e)}
+            if found.get("error"):
+                found["error"] += network_hint(found["error"])
             with self.lock:
                 self.jobs[job].update(done=True, found=found)
 
@@ -188,7 +200,7 @@ class SetupService:
         """Fetch an all-sky picture once and return a preview (the camera is only read)."""
         got = self.sky_check(str(body.get("url") or ""))
         if got.get("error"):
-            raise ValueError(got["error"])
+            raise ValueError(got["error"] + network_hint(got["error"]))
         return {"url": got["url"], "width": got["width"], "height": got["height"], "age_s": got["age_s"],
                 "preview": "data:image/jpeg;base64," + base64.b64encode(got["preview"]).decode()}
 
