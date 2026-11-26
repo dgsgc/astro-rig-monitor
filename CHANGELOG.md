@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+**New**
+- **Setup page:** start the monitor without a `config.toml` and it serves a setup page at `http://localhost:8080/setup` instead: add rigs (with the same read-only listen to detect their settings), phone alerts with a test button, site position, reports and MQTT. Saving starts the monitor. Later, the web page links to it on the monitor's own computer to add rigs or start again; the monitor restarts itself with the new file. Only the monitor's own computer can use it unless you pass `--setup-from-lan` (first run) or set `[web] setup_from_lan = true`. `python -m arm setup` still works.
+
 ## 0.2.0 (26 November 2026)
 
 **New**

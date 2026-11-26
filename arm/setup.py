@@ -200,6 +200,64 @@ def ask_rig(a: Asker, taken: List[str], probe=listen) -> dict:
     return rig
 
 
+def make_rig(ans: dict, taken: Iterable[str]) -> dict:
+    """A rig's settings from the answers on the setup page (arm/setup_web.py), with the same
+    defaults as the questions above. Raises ValueError for a missing or bad answer."""
+    def num(key, default=None):
+        v = ans.get(key)
+        if v in (None, ""):
+            if default is None:
+                raise ValueError(f"{key} is needed")
+            return default
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            raise ValueError(f"{key} must be a number") from None
+
+    name = str(ans.get("name") or "").strip()
+    host = str(ans.get("host") or "").strip()
+    if not name or not host:
+        raise ValueError("a rig needs a name and an address")
+    if not re.fullmatch(r"[A-Za-z0-9.:_\-\[\]]+", host):
+        raise ValueError(f"{host!r} doesn't look like an IP address or host name")
+    dialect = ans.get("dialect") or "asiair"
+    if dialect not in ("asiair", "phd2", "tracker"):
+        raise ValueError(f"unknown rig type {dialect!r}")
+    rig: dict = {"name": name, "id": rig_id(name, taken), "host": host, "dialect": dialect}
+    if dialect == "tracker":
+        return rig
+    rig["port"] = int(num("port", 4400))
+    units = ans.get("units") or ("arcsec" if dialect == "asiair" else "pixels")
+    if units not in ("arcsec", "pixels"):
+        raise ValueError("units must be arcsec or pixels")
+    rig["units"] = units
+    if units == "pixels":
+        rig["guide_scale"] = num("guide_scale")
+    rig["warn"] = num("warn", 1.0)
+    rig["alert"] = num("alert", max(1.5, rig["warn"] + 0.2))
+    if rig["alert"] <= rig["warn"]:
+        raise ValueError("the ALERT level must be above the WARN level")
+    if dialect == "phd2":
+        if ans.get("nina"):
+            rig.update(planned_stop_grace_s=300, frame_timeout_s=60, screen_dithers=False)
+    else:
+        rig["planned_stop_grace_s"] = 600
+    rig["filter_wheel"] = bool(ans.get("filter_wheel"))
+    return rig
+
+
+def render_rigs(rigs: List[dict]) -> str:
+    """The [rigs.*] blocks for a list of rigs (also used to add rigs to an existing file)."""
+    out: List[str] = []
+    for r in rigs:
+        out.append(f"[rigs.{r['id']}]")
+        for k, v in r.items():
+            if k != "id" and v is not None:
+                out.append(f"{k} = {fmt(v)}")
+        out.append("")
+    return "\n".join(out)
+
+
 def fmt(v) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -228,13 +286,7 @@ def render(rigs: List[dict], site: Optional[tuple], web_port: Optional[int], rep
     if site:
         out += ["[defaults]", "# site position: a rig that has stopped guiding as the sun rises disarms itself",
                 f"lat = {site[0]:g}", f"lon = {site[1]:g}", ""]
-    for r in rigs:
-        out.append(f"[rigs.{r['id']}]")
-        for k, v in r.items():
-            if k != "id" and v is not None:
-                out.append(f"{k} = {fmt(v)}")
-        out.append("")
-    return "\n".join(out)
+    return "\n".join(out) + "\n" + render_rigs(rigs)
 
 
 def main(argv=None, ask: Callable[[str], str] = input, say: Callable[[str], None] = print,

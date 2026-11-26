@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111110">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<title>Astro Rig Monitor setup</title>
+<style>
+:root {
+  --bg: #111110; --row: #1c1c1b; --line: #2c2c2a; --field: #262624;
+  --text: #f1efe8; --text2: #b4b2a9; --muted: #888780;
+  --green: #639922; --green-lt: #97c459; --amber-lt: #fac775; --red: #e24b4a; --red-lt: #f7c1c1;
+  --accent: #378add;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-left)) 40px;
+}
+main { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 22px 0 4px; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+p { margin: 6px 0; }
+.lead { color: var(--text2); margin-bottom: 18px; }
+.hint { color: var(--muted); font-size: 13px; }
+section, .rig { background: var(--row); border-radius: 12px; padding: 16px; margin: 0 0 14px; }
+.rig { border: 1px solid var(--line); }
+.rig-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rig-head h2 { flex: 1; margin: 0; }
+.grid { display: grid; gap: 10px 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+.full { grid-column: 1 / -1; }
+label { display: block; font-size: 13px; color: var(--text2); }
+label > input, label > select { margin-top: 4px; }
+input[type=text], input[type=number], input[type=url], select {
+  width: 100%; font: inherit; color: var(--text); background: var(--field);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--text); }
+.check input { margin-top: 3px; }
+button { font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button:hover { border-color: var(--text2); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 10px 20px; }
+button.link { background: none; border: 0; color: var(--muted); padding: 4px 6px; }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.found { font-size: 13px; margin-top: 8px; color: var(--text2); }
+.found.good { color: var(--green-lt); }
+.found.bad { color: var(--red-lt); }
+.msg { margin: 12px 0; padding: 10px 12px; border-radius: 10px; display: none; }
+.msg.show { display: block; }
+.msg.bad { background: #501313; color: var(--red-lt); }
+.msg.good { background: #1f3310; color: var(--green-lt); }
+.choice { display: grid; gap: 8px; margin-top: 10px; }
+[hidden] { display: none !important; }
+code { background: var(--field); border-radius: 4px; padding: 1px 5px; font-size: 13px; word-break: break-all; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Astro Rig Monitor setup</h1>
+  <p class="lead">Add your rigs and choose how you want to be told when guiding goes wrong.
+    The monitor only listens to your rigs: nothing is ever sent to them.</p>
+
+  <div id="loading" class="hint">Loading…</div>
+
+  <section id="existing" hidden>
+    <h2>Current settings</h2>
+    <p class="hint">File: <code id="exPath"></code></p>
+    <p id="exRigs"></p>
+    <p id="exError" class="found bad" hidden></p>
+    <div class="choice">
+      <label class="check"><input type="radio" name="mode" value="add" checked>
+        <span><b>Add rigs</b> to these settings. Everything already in the file stays as it is.</span></label>
+      <label class="check"><input type="radio" name="mode" value="new">
+        <span><b>Start again</b> with new settings. The old file is kept as a backup next to it.</span></label>
+    </div>
+  </section>
+
+  <div id="form" hidden>
+    <div id="rigs"></div>
+    <p><button type="button" id="addRig">+ Add another rig</button></p>
+
+    <div id="general">
+      <section>
+        <h2>Where you are (optional)</h2>
+        <p class="hint">When the sun comes up, rigs that have stopped guiding switch off their alerts,
+          so a finished night doesn't alert all morning. The nearest town is close enough.</p>
+        <div class="grid">
+          <label>Latitude (north +, south −)<input type="number" id="lat" step="any" min="-90" max="90" placeholder="e.g. 51.48"></label>
+          <label>Longitude (east +, west −)<input type="number" id="lon" step="any" min="-180" max="180" placeholder="e.g. -0.01"></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Phone alerts</h2>
+        <p class="hint">Free with the <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a> app
+          (iPhone and Android), or a Discord channel.</p>
+        <label class="check"><input type="checkbox" id="useNtfy" checked> <span>Send alerts to the ntfy app</span></label>
+        <div id="ntfyBox" class="grid" style="margin-top:8px">
+          <label class="full">ntfy topic link (anyone who knows it can read your alerts, so keep it long)
+            <input type="url" id="ntfyUrl"></label>
+          <p class="hint full" id="ntfyHint"></p>
+        </div>
+        <div class="grid" style="margin-top:10px">
+          <label class="full">Discord webhook link (optional)
+            <input type="url" id="discord" placeholder="https://discord.com/api/webhooks/…"></label>
+          <label class="check full"><input type="checkbox" id="notifyWarn"> <span>Also alert on WARN, not only ALERT</span></label>
+        </div>
+        <p class="row" style="margin-top:10px"><button type="button" id="testNotify">Send a test alert</button>
+          <span id="testMsg" class="hint"></span></p>
+      </section>
+
+      <section>
+        <h2>More</h2>
+        <div class="grid">
+          <label>Web page port<input type="number" id="webPort" value="8080" min="0" max="65535"></label>
+          <div></div>
+          <label class="check full"><input type="checkbox" id="report" checked>
+            <span>Record each night and make a report page every morning</span></label>
+          <label class="check full"><input type="checkbox" id="useMqtt">
+            <span>Publish to an MQTT broker (for an ESP32 desk display or Home Assistant)</span></label>
+          <label id="mqttHostL" hidden>Broker address<input type="text" id="mqttHost" value="127.0.0.1"></label>
+          <label id="mqttPortL" hidden>Broker port<input type="number" id="mqttPort" value="1883"></label>
+        </div>
+      </section>
+    </div>
+
+    <div id="msg" class="msg" role="status"></div>
+    <p class="row"><button type="button" class="primary" id="save">Save and start</button>
+      <span class="hint" id="saveHint"></span></p>
+  </div>
+
+  <section id="done" hidden>
+    <h2>Saved</h2>
+    <p id="doneText"></p>
+    <p id="doneLink" class="hint">The monitor is restarting with the new settings…</p>
+  </section>
+</main>
+
+<template id="rigT">
+  <div class="rig">
+    <div class="rig-head"><h2 class="title">Rig</h2><button type="button" class="link remove">Remove</button></div>
+    <div class="grid">
+      <label>Name, as shown on the page<input type="text" class="name" placeholder="e.g. Refractor" maxlength="40"></label>
+      <label>What it is
+        <select class="dialect">
+          <option value="asiair">ASIAIR</option>
+          <option value="phd2">PHD2 (with NINA, SGP, APT…)</option>
+          <option value="tracker">Tracker without guiding (status page)</option>
+        </select></label>
+      <label class="hostL">IP address or host name<input type="text" class="host" placeholder="e.g. 192.168.1.50" autocapitalize="off" spellcheck="false"></label>
+      <label class="portL">Guiding event port<input type="number" class="port" value="4400" min="1" max="65535"></label>
+      <p class="hint full where">ASIAIR: the app's Settings → About shows its IP address. PHD2: the PC's address, with
+        Tools → Enable Server turned on.</p>
+      <div class="full probe">
+        <div class="row"><button type="button" class="listen">Listen to detect its settings</button>
+          <span class="hint">Read-only, up to a minute. Best while it's guiding.</span></div>
+        <div class="found" hidden></div>
+      </div>
+      <label class="unitsL">Guiding figures are in
+        <select class="units"><option value="arcsec">arcsec (most ASIAIRs)</option><option value="pixels">guide-camera pixels (PHD2)</option></select></label>
+      <label class="scaleL">Guide scale ("/pixel, binning included)<input type="number" class="scale" step="any" min="0" placeholder="e.g. 2.4"></label>
+      <p class="hint full scaleHint">PHD2 shows the guide scale in its Guiding Assistant and log; NINA in the Guider panel.</p>
+      <label class="levelL">WARN above (total RMS, ")<input type="number" class="warn" value="1.0" step="0.05" min="0"></label>
+      <label class="levelL">ALERT above (total RMS, ")<input type="number" class="alert" value="1.5" step="0.05" min="0"></label>
+      <p class="hint full levelL">A common start is WARN at about half your imaging pixel scale. Adjust after the first night.</p>
+      <label class="check full ninaL"><input type="checkbox" class="nina">
+        <span>PHD2 is run by NINA or another sequencer that stops guiding for autofocus</span></label>
+      <label class="check full fwL"><input type="checkbox" class="fw">
+        <span>The imaging plan changes filters (only used to label pauses in the night report)</span></label>
+      <p class="hint full trackerHint">The monitor reads <code>http://&lt;address&gt;/status</code> every 10 s.
+        It never sends commands to the tracker.</p>
+    </div>
+  </div>
+</template>
+
+<script>
+"use strict";
+const TOKEN = "{{TOKEN}}";
+const $ = (id) => document.getElementById(id);
+let state = null;
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : {
+    method: "POST", body: JSON.stringify(body),
+    headers: {"Content-Type": "application/json", "X-Setup-Token": TOKEN},
+  };
+  const r = await fetch("/setup/api/" + path, opts);
+  let j = {};
+  try { j = await r.json(); } catch (e) { /* not JSON */ }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+function randomTopic() {
+  const a = new Uint8Array(12);
+  crypto.getRandomValues(a);
+  return "arm-" + Array.from(a, (b) => "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]).join("");
+}
+
+function setNtfyHint() {
+  const u = $("ntfyUrl").value.trim();
+  const i = u.lastIndexOf("/");
+  $("ntfyHint").textContent = i > 8
+    ? "In the ntfy app, tap + and subscribe to the topic " + u.slice(i + 1)
+      + (u.startsWith("https://ntfy.sh/") ? "." : " on the server " + u.slice(0, i) + ".")
+    : "";
+}
+
+// --- rigs ----------------------------------------------------------------------------------
+
+function addRig() {
+  const el = $("rigT").content.firstElementChild.cloneNode(true);
+  const q = (c) => el.querySelector("." + c);
+  const show = () => {
+    const d = q("dialect").value, tracker = d === "tracker";
+    for (const c of ["portL", "probe", "unitsL", "fwL"]) q(c).hidden = tracker;
+    el.querySelectorAll(".levelL").forEach((x) => x.hidden = tracker);
+    q("ninaL").hidden = d !== "phd2";
+    q("where").hidden = tracker;
+    q("trackerHint").hidden = !tracker;
+    const pixels = !tracker && q("units").value === "pixels";
+    q("scaleL").hidden = q("scaleHint").hidden = !pixels;
+  };
+  q("dialect").addEventListener("change", () => {
+    q("units").value = q("dialect").value === "phd2" ? "pixels" : "arcsec";
+    show();
+  });
+  q("units").addEventListener("change", show);
+  q("remove").addEventListener("click", () => { el.remove(); renumber(); });
+  q("listen").addEventListener("click", () => listen(el, q, show));
+  $("rigs").appendChild(el);
+  show();
+  renumber();
+  q("name").focus();
+}
+
+function renumber() {
+  const rigs = $("rigs").querySelectorAll(".rig");
+  rigs.forEach((el, i) => {
+    el.querySelector(".title").textContent = (state && state.exists && mode() === "add" ? "New rig " : "Rig ") + (i + 1);
+    el.querySelector(".remove").hidden = rigs.length < 2;
+  });
+}
+
+async function listen(el, q, show) {
+  const out = q("found"), btn = q("listen");
+  out.hidden = false;
+  out.className = "found";
+  out.textContent = "Connecting…";
+  btn.disabled = true;
+  try {
+    const {job} = await api("probe", {host: q("host").value.trim(), port: q("port").value});
+    out.textContent = "Listening (read-only)… this can take up to a minute.";
+    let got = null;
+    for (let i = 0; i < 45 && !(got && got.done); i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      got = await api("probe?job=" + job);
+    }
+    const f = (got && got.found) || {};
+    if (!got || !got.done) throw new Error("no answer in time");
+    if (f.error) throw new Error(f.error);
+    let text = "Found " + (f.version || "unknown software") + ", " + f.frames + " guide frames";
+    if (f.ratio) text += ", sky/camera ratio " + f.ratio;
+    if (f.dialect) q("dialect").value = f.dialect;
+    if (f.units) {
+      q("units").value = f.units;
+      text += f.units === "arcsec"
+        ? ". It reports arcsec (guide scale about " + f.guide_scale + "\"/px), so nothing more is needed."
+        : ". It reports pixels: enter the guide scale below.";
+    } else if (f.dialect === "asiair") {
+      q("units").value = "arcsec";
+      text += ". Couldn't tell arcsec from pixels without guiding frames; most ASIAIRs report arcsec.";
+    }
+    if (f.guide_scale && !q("scale").value) q("scale").value = f.guide_scale;
+    out.className = "found good";
+    out.textContent = text;
+    show();
+  } catch (e) {
+    out.className = "found bad";
+    out.textContent = e.message + ". Check the address and that it's switched on; you can also fill this in yourself.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function rigAnswers() {
+  return Array.from($("rigs").querySelectorAll(".rig"), (el) => {
+    const q = (c) => el.querySelector("." + c);
+    return {
+      name: q("name").value.trim(), host: q("host").value.trim(), dialect: q("dialect").value,
+      port: q("port").value, units: q("units").value, guide_scale: q("scale").value,
+      warn: q("warn").value, alert: q("alert").value, nina: q("nina").checked, filter_wheel: q("fw").checked,
+    };
+  });
+}
+
+// --- saving --------------------------------------------------------------------------------
+
+function mode() {
+  return state.exists ? document.querySelector("input[name=mode]:checked").value : "new";
+}
+
+function showMode() {
+  $("general").hidden = mode() === "add";
+  renumber();
+  $("save").textContent = state.exists ? "Save and restart" : "Save and start";
+  $("saveHint").textContent = mode() === "new" && state.exists ? "The old file is kept as a backup." : "";
+}
+
+function say(text, good) {
+  const m = $("msg");
+  m.textContent = text;
+  m.className = "msg show " + (good ? "good" : "bad");
+  if (!good) m.scrollIntoView({block: "nearest"});
+}
+
+function notifyAnswers() {
+  return {
+    ntfy_url: $("useNtfy").checked ? $("ntfyUrl").value.trim() : "",
+    discord_webhook: $("discord").value.trim(),
+    level: $("notifyWarn").checked ? "warn" : "alert",
+  };
+}
+
+async function save() {
+  const body = {mode: mode(), rigs: rigAnswers()};
+  if (body.mode === "new") {
+    Object.assign(body, {
+      site: {lat: $("lat").value, lon: $("lon").value},
+      web_port: $("webPort").value,
+      report: $("report").checked,
+      notify: notifyAnswers(),
+      mqtt: $("useMqtt").checked ? {host: $("mqttHost").value.trim(), port: $("mqttPort").value} : null,
+    });
+  }
+  $("save").disabled = true;
+  try {
+    const r = await api("save", body);
+    $("form").hidden = $("existing").hidden = true;
+    $("done").hidden = false;
+    $("doneText").textContent = "Saved " + r.rigs.join(", ") + " to " + r.path + "."
+      + (r.backup ? " The old settings are in " + r.backup + "." : "");
+    waitForMonitor(r.web_port);
+  } catch (e) {
+    say(e.message, false);
+  } finally {
+    $("save").disabled = false;
+  }
+}
+
+async function waitForMonitor(port) {
+  const link = $("doneLink");
+  if (!port) {
+    link.textContent = "The monitor is starting. You chose no web page, so alerts go to your phone or display.";
+    return;
+  }
+  const here = String(port) === (location.port || "80");
+  const url = location.protocol + "//" + location.hostname + ":" + port + "/";
+  if (!here) {
+    link.innerHTML = "";
+    link.append("The monitor is starting. Its page will be at ");
+    const a = document.createElement("a");
+    a.href = a.textContent = url;
+    link.append(a, ".");
+    return;
+  }
+  await new Promise((r) => setTimeout(r, 2500));
+  for (let i = 0; i < 30; i++) {
+    try {
+      const r = await fetch("/state.json", {cache: "no-store"});
+      if (r.ok && (await r.json()).rigs.length) { location.href = "/"; return; }
+    } catch (e) { /* still restarting */ }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  link.textContent = "The monitor is taking a while to start. Its log (arm.log) says why.";
+}
+
+async function testNotify() {
+  $("testMsg").textContent = "Sending…";
+  try {
+    await api("test-notify", notifyAnswers());
+    $("testMsg").textContent = "Sent. Check your phone or Discord.";
+  } catch (e) {
+    $("testMsg").textContent = "Didn't send: " + e.message;
+  }
+}
+
+// --- start ---------------------------------------------------------------------------------
+
+async function start() {
+  try {
+    state = await api("state");
+  } catch (e) {
+    $("loading").textContent = e.message;
+    return;
+  }
+  $("loading").hidden = true;
+  if (state.exists) {
+    $("existing").hidden = false;
+    $("exPath").textContent = state.path;
+    $("exRigs").textContent = state.rigs.length
+      ? "Rigs: " + state.rigs.map((r) => r.name).join(", ") + "."
+      : "No rigs yet.";
+    if (state.error) { $("exError").hidden = false; $("exError").textContent = state.error; }
+    document.querySelectorAll("input[name=mode]").forEach((r) => r.addEventListener("change", showMode));
+    if (state.error) document.querySelector("input[name=mode][value=new]").checked = true;
+  }
+  $("ntfyUrl").value = "https://ntfy.sh/" + randomTopic();
+  setNtfyHint();
+  $("ntfyUrl").addEventListener("input", setNtfyHint);
+  $("useNtfy").addEventListener("change", () => $("ntfyBox").hidden = !$("useNtfy").checked);
+  $("useMqtt").addEventListener("change", () => $("mqttHostL").hidden = $("mqttPortL").hidden = !$("useMqtt").checked);
+  $("addRig").addEventListener("click", addRig);
+  $("save").addEventListener("click", save);
+  $("testNotify").addEventListener("click", testNotify);
+  $("form").hidden = false;
+  addRig();
+  showMode();
+}
+start();
+</script>
+</body>
+</html>

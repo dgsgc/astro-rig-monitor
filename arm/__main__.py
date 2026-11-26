@@ -3,6 +3,7 @@
 import argparse
 import logging
 import logging.handlers
+import os
 import signal
 import sys
 import threading
@@ -15,6 +16,7 @@ from .morning import MorningReport
 from .notify import Notifier
 from .publish import MqttOut, NullOut, PrintOut, Scheduler
 from .recorder import NightRecorder
+from .setup_web import SetupService
 from .sky import SkyFetcher
 from .source import RigReader
 from .tracker import TrackerMonitor, TrackerReader
@@ -36,8 +38,15 @@ def main(argv=None):
     ap.add_argument("--config", default="config.toml")
     ap.add_argument("--dry-run", action="store_true", help="print every message instead of publishing to MQTT")
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--setup-port", type=int, default=8080,
+                    help="first run (no config file yet): port for the setup page (default 8080)")
+    ap.add_argument("--setup-from-lan", action="store_true",
+                    help="first run: let other computers open the setup page (e.g. on a Raspberry Pi)")
     args = ap.parse_args(argv)
 
+    if not os.path.exists(args.config):
+        if not first_run_setup(args):
+            return 1
     cfg = load(args.config)
     console = logging.StreamHandler()
     if cfg.log_file and not sys.stderr.isatty():
@@ -60,6 +69,13 @@ def main(argv=None):
             n for n, u in (("ntfy", cfg.notify.ntfy_url), ("Discord", cfg.notify.discord_webhook)) if u))
 
     stop = threading.Event()
+    restart = threading.Event()
+
+    def saved():                    # the setup page wrote a new config: start again with it
+        log.info("settings changed on the setup page: restarting")
+        restart.set()
+        stop.set()
+
     recorder = None
     rep = cfg.report
     if rep.enabled:
@@ -72,7 +88,8 @@ def main(argv=None):
         hub = WebHub({r.id: r.name or r.id for r in cfg.rigs})
         try:
             web = WebServer(hub, cfg.web.host, cfg.web.port, stop, rep.reports_dir if rep.enabled else None,
-                            allow_origin=cfg.web.allow_origin)
+                            allow_origin=cfg.web.allow_origin,
+                            setup=SetupService(args.config, cfg.web.setup_from_lan, on_saved=saved))
             web.start()
             listeners.append(hub)
         except OSError as e:        # port in use etc.: alerting matters more than the page
@@ -115,6 +132,40 @@ def main(argv=None):
         if recorder:
             recorder.close()
         out.close()
+    if restart.is_set():
+        logging.shutdown()
+        os.execv(sys.executable, [sys.executable, "-m", "arm", *argv])
+
+
+def first_run_setup(args) -> bool:
+    """No config file yet: serve only the setup page until it's saved. True once it is."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    done, stop = threading.Event(), threading.Event()
+    svc = SetupService(args.config, args.setup_from_lan, on_saved=done.set)
+    host = "0.0.0.0" if args.setup_from_lan else "127.0.0.1"
+    try:
+        web = WebServer(WebHub({}), host, args.setup_port, stop, setup=svc, setup_only=True)
+    except OSError as e:
+        print(f"No {args.config} yet, and the setup page couldn't start on port {args.setup_port}: {e}\n"
+              f"Use --setup-port, or run:  python -m arm setup", flush=True)
+        return False
+    web.start()
+    where = "http://<this computer's address>" if args.setup_from_lan else "http://localhost"
+    print(f"No {args.config} yet. Open {where}:{web.port}/setup in a browser to set up the monitor.\n"
+          f"(Or stop this and run:  python -m arm setup  to answer the questions here.)", flush=True)
+    for sig in ("SIGINT", "SIGTERM", "SIGBREAK"):
+        if hasattr(signal, sig):
+            signal.signal(getattr(signal, sig), lambda *_: stop.set())
+    while not (done.is_set() or stop.is_set()):
+        stop.wait(0.5)
+    web.close()
+    if not done.is_set():
+        return False
+    print(f"Saved {args.config}. Starting the monitor.", flush=True)
+    root = logging.getLogger()
+    for h in list(root.handlers):   # main() sets logging up again from the new config
+        root.removeHandler(h)
+    return True
 
 
 def test_notify(argv):

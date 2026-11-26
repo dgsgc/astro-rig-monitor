@@ -6,9 +6,10 @@ The bridge serves it itself (Python's standard library, no extra packages):
   /state.json   one snapshot of the latest messages, for displays that would rather poll
   /sky/<rig>.jpg  the latest all-sky image for a rig (small, as sent to the display)
   /sky/large/<rig>.jpg  the same image, large
+  /setup        the setup page (arm/setup_web.py): only from this computer unless setup_from_lan
 
-Nothing here can change anything: there are no commands, so a tap on a phone can't disarm
-a rig. Keep it on the LAN or Tailscale; don't forward a port to it from the internet.
+Apart from the setup page, nothing here can change anything: there are no commands, so a tap on
+a phone can't disarm a rig. The setup page writes the settings file and nothing else. Keep it on the LAN or Tailscale; don't forward a port to it from the internet.
 """
 
 import json
@@ -166,7 +167,8 @@ class Tee:
         self.out.close()
 
 
-def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str], allow_origin: str = ""):
+def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str], allow_origin: str = "",
+             setup=None, setup_only: bool = False):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"astro-rig-monitor/{__version__}"
         protocol_version = "HTTP/1.1"
@@ -192,8 +194,25 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str], all
         def do_HEAD(self):
             self.do_GET()
 
+        def do_POST(self):
+            path, _, query = self.path.partition("?")
+            if setup and setup.handle(self, "POST", path, query):
+                return
+            self._body(404, "text/plain", b"not found")
+
         def do_GET(self):
-            path = self.path.split("?", 1)[0]
+            path, _, query = self.path.partition("?")
+            if setup and setup.handle(self, "GET", path, query):
+                return
+            if setup_only:          # first run: nothing to show until the settings are saved
+                if path in ("/", "/index.html"):
+                    self.send_response(302)
+                    self.send_header("Location", "/setup")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if path not in ("/icon.svg", "/manifest.webmanifest"):
+                    return self._body(404, "text/plain", b"not set up yet: open /setup")
             if path in ("/", "/index.html"):
                 return self._static("index.html", "text/html; charset=utf-8")
             if path == "/manifest.webmanifest":
@@ -274,10 +293,11 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str], all
 
 class WebServer(threading.Thread):
     def __init__(self, hub: WebHub, host: str, port: int, stop: threading.Event, reports_dir: Optional[str] = None,
-                 allow_origin: str = ""):
+                 allow_origin: str = "", setup=None, setup_only: bool = False):
         super().__init__(name="web", daemon=True)
         self.stop_event = stop
-        self.httpd = ThreadingHTTPServer((host, port), _handler(hub, stop, reports_dir, allow_origin))
+        self.httpd = ThreadingHTTPServer((host, port), _handler(hub, stop, reports_dir, allow_origin,
+                                                                   setup, setup_only))
         self.httpd.daemon_threads = True
         self.host, self.port = host, self.httpd.server_address[1]
 

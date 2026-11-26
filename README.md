@@ -68,13 +68,15 @@ git clone https://github.com/dgsgc/astro-rig-monitor.git
 cd astro-rig-monitor
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt          # Windows: .venv\Scripts\pip install -r requirements.txt
-.venv/bin/python -m arm setup                  # asks a few questions, writes config.toml
-.venv/bin/python -m arm                        # run it; Ctrl+C to stop
+.venv/bin/python -m arm                        # first run: opens the setup page; Ctrl+C to stop
 ```
 
-Then open `http://<that computer's address>:8080` on your phone. On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`.
+The first time, there's no `config.toml` yet, so the monitor serves a **setup page** at `http://localhost:8080/setup` on the same computer. Add your rigs, choose your alerts and press **Save and start**; the monitor then starts with those settings. Then open `http://<that computer's address>:8080` on your phone. On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`.
 
-`setup` listens to each rig for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Run it while the rig is guiding and there's almost nothing to answer. It never sends anything to the rig.
+- **Setting up a computer without a screen** (a Raspberry Pi, say): run `.venv/bin/python -m arm --setup-from-lan` and open `http://<its address>:8080/setup` from another computer.
+- **Rather answer questions in the terminal?** `.venv/bin/python -m arm setup` asks the same questions and writes `config.toml`.
+- **Listen to detect:** for each rig, the page (or `setup`) can listen to it for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Do it while the rig is guiding and there's almost nothing to answer. It never sends anything to the rig.
+- **Adding rigs later:** the web page has an **Add rigs or change settings** link at the bottom when you open it on the monitor's own computer (`http://localhost:8080`). Adding a rig keeps everything already in the file; starting again keeps the old file as a backup. The monitor restarts itself with the new settings.
 
 If you set up phone alerts, check they arrive:
 
@@ -93,6 +95,8 @@ Each installer copies the program and your `config.toml` to `~/astro-rig-monitor
 | Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File tools\install_service_windows.ps1` | same with `-Remove` |
 
 The log is `arm.log` in that folder. To keep your `config.toml` somewhere else (say, a private folder or repo), add `--config <path>` (Windows: `-Config <path>`).
+
+The service runs from its own copy of `config.toml`. Changes made on the setup page go into that copy, so if you keep the original elsewhere, copy them back before running the installer again (it overwrites the copy).
 
 ## Setting the levels
 

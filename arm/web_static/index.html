@@ -218,7 +218,7 @@ body.detail .reports { display: none; }
 </main>
 <dialog id="skyFull" aria-label="Sky picture"><img alt="All-sky camera, full screen"></dialog>
 <nav class="reports" id="reports" hidden aria-label="Night reports"></nav>
-<footer id="foot">Read-only view of the guiding bridge</footer>
+<footer id="foot">Astro Rig Monitor</footer>
 
 <script>
 "use strict";
@@ -512,7 +512,13 @@ function onMessage(m) {
     order = m.rigs.map((x) => x.id);
     for (const x of m.rigs) rigs.get(x.id).name = x.name;
     if (order.join() !== known) buildRows();
-    $("foot").textContent = `Read-only view of the guiding bridge ${m.version}`;
+    $("foot").textContent = `Astro Rig Monitor ${m.version}. Read-only: nothing here changes a rig.`;
+    if (["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)) {   // setup only works on this computer
+      const a = document.createElement("a");
+      a.href = "/setup"; a.textContent = "Add rigs or change settings";
+      a.style.color = "inherit";
+      $("foot").append(" ", a);
+    }
     if (openRig === null) route();
     return;
   }

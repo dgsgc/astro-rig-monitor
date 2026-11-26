@@ -1,12 +1,12 @@
 # Configuration
 
-Everything lives in `config.toml`. `python -m arm setup` writes one for you; [`config.example.toml`](../config.example.toml) shows every setting. After changing it, restart the program (or run the service installer again).
+Everything lives in `config.toml`. The setup page (`http://localhost:8080/setup`, opened automatically the first time) or `python -m arm setup` writes one for you; [`config.example.toml`](../config.example.toml) shows every setting. After changing it, restart the program (or run the service installer again).
 
 ## Sections
 
 | Section | Turns on | Notes |
 |---|---|---|
-| `[web]` | The web page | `port` (8080), `host` ("0.0.0.0" = whole home network, "127.0.0.1" = this computer only), `allow_origin` (off; `"*"` lets your own page elsewhere read the data, see [build-a-display.md](build-a-display.md#2-your-own-web-page)) |
+| `[web]` | The web page | `port` (8080), `host` ("0.0.0.0" = whole home network, "127.0.0.1" = this computer only), `allow_origin` (off; `"*"` lets your own page elsewhere read the data, see [build-a-display.md](build-a-display.md#2-your-own-web-page)), `setup_from_lan` (false: the setup page at `/setup` only works on the monitor's own computer; true lets any computer on your network change the settings) |
 | `[report]` | Night recording and the morning report | `at` ("08:00", local time), `keep_days` (30), `nights_dir`, `reports_dir`, `archive_dir` (off; see [Night reports](#night-reports)) |
 | `[notify]` | Phone / chat alerts | See [Notifications](#notifications) |
 | `[mqtt]` | Publishing to an MQTT broker | `host`, `port`, `username`, `password`, `tls`, `ca_file`, `prefix` ("arm": every topic starts with it). See [mqtt-spec.md](mqtt-spec.md) |

@@ -13,7 +13,8 @@
 | `arm/recorder.py`, `morning.py`, `report.py` | Night recording and the morning report |
 | `arm/sky.py` | All-sky camera images |
 | `arm/sun.py` | Sun position, for dawn and meridian flips |
-| `arm/setup.py` | `python -m arm setup` |
+| `arm/setup.py` | `python -m arm setup` (questions in the terminal) |
+| `arm/setup_web.py`, `arm/web_static/setup.html` | the setup page (`/setup`), also served on the first run when there's no config file |
 | `arm/sim.py` | Synthetic PHD2 / ASIAIR streams for tests and tools |
 | `tools/fake_rig.py` | Serves a synthetic stream on localhost, to test without a telescope |
 | `tools/guide_logger.py` | Records a rig's raw stream to a file (read-only) |

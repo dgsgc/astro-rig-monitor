@@ -1,6 +1,7 @@
 # Astro Rig Monitor settings: every option, with examples.
 #
-# The easy way to make your own:  python -m arm setup   (asks questions, writes config.toml)
+# The easy way to make your own: start the monitor without a config.toml and open
+# http://localhost:8080/setup, or run  python -m arm setup  (asks questions in the terminal).
 # Or copy this file to config.toml (which git ignores) and edit it.
 # Full explanations: docs/configuration.md
 
@@ -14,6 +15,7 @@ log_file = "arm.log"     # rotating log; leave out to log to the console only
 port = 8080
 # host = "127.0.0.1"          # this computer only (default "0.0.0.0": the whole home network)
 # allow_origin = "*"          # let your own page, served from another address, read /events and /state.json
+# setup_from_lan = true       # let other computers use the setup page (/setup); off = only this computer
 
 # Record every night and build a report page each morning, linked from the web page.
 [report]
