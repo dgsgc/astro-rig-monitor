@@ -29,7 +29,10 @@ class Sim:
         return self
 
     def version(self):
-        self._emit("Version", PHDVersion="2.6.13", PHDSubver="", MsgVersion=1)
+        if self.dialect == "asiair":          # what a real ASIAIR says on port 4400: no PHDVersion
+            self._emit("Version", name="ASI AIR guider", svr_ver_int=12)
+        else:
+            self._emit("Version", PHDVersion="2.6.13", PHDSubver="", MsgVersion=1)
         return self
 
     def app_state(self, state: str):

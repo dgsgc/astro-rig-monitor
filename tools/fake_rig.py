@@ -74,7 +74,8 @@ def answer_questions(conn: socket.socket, args):
 
 
 def serve_client(conn: socket.socket, args):
-    threading.Thread(target=answer_questions, args=(conn, args), daemon=True).start()
+    if args.dialect == "phd2":                # an ASIAIR's port 4400 answers nothing
+        threading.Thread(target=answer_questions, args=(conn, args), daemon=True).start()
     try:
         while True:
             lines = scenario(args.scenario, args.exposure, args.dialect).lines
