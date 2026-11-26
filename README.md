@@ -55,53 +55,68 @@ One bad frame never alerts, dithers and settling are left out of the alert figur
 ## What you need
 
 - A computer that stays on through the night, on the same network as the rigs: a Raspberry Pi, a Mac, a Windows PC or a Linux box. It uses very little CPU.
-- Python 3.11 or later.
+- On a Mac, nothing else: the app brings its own Python. Elsewhere, Python 3.11 or later.
 - Rigs running an **ASIAIR** (any model) or **PHD2** 2.6 or later with its event server on (PHD2: *Tools → Enable Server*, on by default). Give each ASIAIR a fixed address on your router (a DHCP reservation).
 - Optional: a tracker without guiding whose controller serves a JSON status page ([details](docs/configuration.md#trackers-without-guiding)).
 - Optional: an MQTT broker such as Mosquitto, only for a microcontroller display or Home Assistant.
 - A remote observatory works too, over [Tailscale](https://tailscale.com) or another VPN. Don't open port 4400 to the internet.
 
-## On a Mac: the app
+## Install
 
-Download **Astro Rig Monitor for Mac** (Apple Silicon or Intel) from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases), drag it to Applications and open it. Your browser opens the setup page; add your rigs and you're done. There's no Terminal or Python to install, and it starts by itself at login. See [mac/README.md](mac/README.md).
+Pick the way for the computer that will run it. Every way runs the same monitor, with the same settings file, web page, alerts and reports.
 
-## Quick start (any computer, from the source)
+### Mac: the app (recommended)
+
+1. Download **Astro Rig Monitor for Mac** from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases) (the `mac-v…` release): `Astro-Rig-Monitor-Apple-Silicon.zip` for an M1 or later, `Astro-Rig-Monitor-Intel.zip` for an Intel Mac (Apple menu → About This Mac says which).
+2. Unzip it, drag **Astro Rig Monitor** into Applications, and open it the first time with right-click → **Open** (it isn't notarised by Apple).
+3. Your browser opens the setup page ([Setting up your rigs](#setting-up-your-rigs)). Allow what macOS asks: the background item and your local network.
+
+It lives in the menu bar, starts at login and keeps the Mac awake while it runs. Needs macOS 13 or later. More in [mac/README.md](mac/README.md).
+
+### Windows
+
+For now, use the [manual install](#manual-install-any-computer) with Python from python.org. A Windows installer is planned.
+
+### Raspberry Pi and Linux
+
+For now, use the [manual install](#manual-install-any-computer). A one-command installer is planned. On a Pi without a screen, set it up from another computer (see below).
+
+### Manual install (any computer)
+
+For Windows, a Raspberry Pi or Linux, or a Mac without the app. Needs Python 3.11 or later and git.
 
 ```bash
 git clone https://github.com/dgsgc/astro-rig-monitor.git
 cd astro-rig-monitor
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt          # Windows: .venv\Scripts\pip install -r requirements.txt
-.venv/bin/python -m arm                        # first run: opens the setup page; Ctrl+C to stop
+.venv/bin/python -m arm                        # first run: serves the setup page; Ctrl+C to stop
 ```
 
-The first time, there's no `config.toml` yet, so the monitor serves a **setup page** at `http://localhost:8080/setup` on the same computer. Add your rigs, choose your alerts and press **Save and start**; the monitor then starts with those settings. Then open `http://<that computer's address>:8080` on your phone. On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`.
+On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`. The first time, there's no `config.toml` yet, so the monitor serves the [setup page](#setting-up-your-rigs) at `http://localhost:8080/setup`. On a computer without a screen (a Raspberry Pi, say), run `.venv/bin/python -m arm --setup-from-lan` instead and open `http://<its address>:8080/setup` from another computer. Rather answer questions in the terminal? `.venv/bin/python -m arm setup` asks the same questions and writes `config.toml`.
 
-- **Setting up a computer without a screen** (a Raspberry Pi, say): run `.venv/bin/python -m arm --setup-from-lan` and open `http://<its address>:8080/setup` from another computer.
-- **Rather answer questions in the terminal?** `.venv/bin/python -m arm setup` asks the same questions and writes `config.toml`.
-- **Listen to detect:** for each rig, the page (or `setup`) can listen to it for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Do it while the rig is guiding and there's almost nothing to answer. It sends an ASIAIR nothing. PHD2 is asked one read-only question, its guide scale (`get_pixel_scale`), so you don't have to look it up; that's the only thing any part of the monitor ever sends to a rig, and the running monitor sends nothing.
-- **All-sky camera (optional):** paste the address of the camera's latest picture (on its web page, right-click the picture and Copy Image Address; a Dropbox share link works too, and the page makes it a direct link). **Check** fetches it once and shows how it will look. The next rig gets the same address, since rigs at one site share a sky.
-- **Adding rigs later:** the web page has an **Add rigs or change settings** link at the bottom when you open it on the monitor's own computer (`http://localhost:8080`). Adding a rig keeps everything already in the file; starting again keeps the old file as a backup. The monitor restarts itself with the new settings.
-
-If you set up phone alerts, check they arrive:
-
-```bash
-.venv/bin/python -m arm test-notify
-```
-
-## Run it in the background
-
-Each installer copies the program and your `config.toml` to `~/astro-rig-monitor` (Windows: `%USERPROFILE%\astro-rig-monitor`), makes its own Python environment there, and starts it as a service that comes back after a reboot. Run it again after changing `config.toml`.
+**Run it in the background.** Once it's set up, stop it (Ctrl+C) and install it as a service that starts by itself and comes back after a reboot:
 
 | System | Install / update | Remove |
 |---|---|---|
 | Raspberry Pi, Linux | `tools/install_service_linux.sh` | `tools/install_service_linux.sh --remove` |
-| macOS | `tools/install_service_mac.sh` | `tools/install_service_mac.sh --remove` |
 | Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File tools\install_service_windows.ps1` | same with `-Remove` |
+| macOS (if not using the app) | `tools/install_service_mac.sh` | `tools/install_service_mac.sh --remove` |
 
-The log is `arm.log` in that folder. To keep your `config.toml` somewhere else (say, a private folder or repo), add `--config <path>` (Windows: `-Config <path>`).
+Each installer copies the program and your `config.toml` to `~/astro-rig-monitor` (Windows: `%USERPROFILE%\astro-rig-monitor`), makes its own Python environment there, and starts the service. Run it again after updating the code (`git pull`) or changing `config.toml`. The log is `arm.log` in that folder. To keep your `config.toml` somewhere else (say, a private folder or repo), add `--config <path>` (Windows: `-Config <path>`).
 
 The service runs from its own copy of `config.toml`. Changes made on the setup page go into that copy, so if you keep the original elsewhere, copy them back before running the installer again (it overwrites the copy).
+
+## Setting up your rigs
+
+The setup page opens the first time (in the Mac app, by itself). Add each rig, choose your alerts and press **Save and start**. Then open `http://<that computer's address>:8080` on your phone (the Mac app's menu has **Open on Your Phone…** with a QR code).
+
+- **Listen to detect:** for each rig, the page can listen to it for up to a minute to work out whether it's an ASIAIR or PHD2 and what units it reports. Do it while the rig is guiding and there's almost nothing to answer. It sends an ASIAIR nothing. PHD2 is asked one read-only question, its guide scale (`get_pixel_scale`), so you don't have to look it up; that's the only thing any part of the monitor ever sends to a rig, and the running monitor sends nothing.
+- **Remote observatory:** use the PC's address on [Tailscale](https://tailscale.com) or another VPN. Never open port 4400 to the internet.
+- **All-sky camera (optional):** paste the address of the camera's latest picture (on its web page, right-click the picture and Copy Image Address; a Dropbox share link works too, and the page makes it a direct link). **Check** fetches it once and shows how it will look. The next rig gets the same address, since rigs at one site share a sky.
+- **Phone alerts:** the free [ntfy](https://ntfy.sh) app (the page makes a private topic and has a test button) and/or a Discord webhook.
+- **Adding rigs later:** the web page has an **Add rigs or change settings** link at the bottom when you open it on the monitor's own computer (`http://localhost:8080`; in the Mac app, **Add Rigs or Change Settings…**). Adding a rig keeps everything already in the file; starting again keeps the old file as a backup. The monitor restarts itself with the new settings.
+- **Settings the page doesn't cover** are in `config.toml` ([every setting](docs/configuration.md)). After editing it, restart the monitor (Mac app: **More → Restart Monitor**; manual install: run the service installer again).
 
 ## Setting the levels
 
