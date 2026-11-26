@@ -67,6 +67,15 @@ class SetupPage(unittest.TestCase):
         r = urllib.request.urlopen(self.base + "/", timeout=5)
         self.assertTrue(r.url.endswith("/setup"))
 
+    def test_first_run_server_closes_each_connection(self):
+        import http.client
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.port, timeout=5)
+        c.request("GET", "/setup/api/state")
+        r = c.getresponse()
+        r.read()
+        self.assertTrue(r.will_close)       # no keep-alive into the monitor proper
+        c.close()
+
     def test_new_settings_are_written_and_load(self):
         body = {"mode": "new", "rigs": [RIG, dict(RIG, name="Widefield", host="widefield.local", dialect="phd2",
                                                   units="pixels", guide_scale="2.4", nina=True)],

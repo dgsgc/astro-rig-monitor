@@ -61,7 +61,11 @@ One bad frame never alerts, dithers and settling are left out of the alert figur
 - Optional: an MQTT broker such as Mosquitto, only for a microcontroller display or Home Assistant.
 - A remote observatory works too, over [Tailscale](https://tailscale.com) or another VPN. Don't open port 4400 to the internet.
 
-## Quick start
+## On a Mac: the app
+
+Download **Astro Rig Monitor for Mac** (Apple Silicon or Intel) from the [releases](https://github.com/dgsgc/astro-rig-monitor/releases), drag it to Applications and open it. Your browser opens the setup page; add your rigs and you're done. There's no Terminal or Python to install, and it starts by itself at login. See [mac/README.md](mac/README.md).
+
+## Quick start (any computer, from the source)
 
 ```bash
 git clone https://github.com/dgsgc/astro-rig-monitor.git

@@ -171,7 +171,9 @@ def _handler(hub: WebHub, stop: threading.Event, reports_dir: Optional[str], all
              setup=None, setup_only: bool = False):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"astro-rig-monitor/{__version__}"
-        protocol_version = "HTTP/1.1"
+        # First run: one request per connection, so a browser can't keep talking to this
+        # setup-only server after the monitor proper has taken over the port.
+        protocol_version = "HTTP/1.0" if setup_only else "HTTP/1.1"
 
         def log_message(self, fmt, *args):      # keep the bridge log quiet
             log.debug("web %s %s", self.address_string(), fmt % args)
