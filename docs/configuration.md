@@ -151,7 +151,7 @@ ntfy_url = "https://ntfy.sh/arm-a-long-random-name"
 - **Open it** at `http://<computer>:8080` on the home network. From elsewhere, use a VPN such as Tailscale; don't forward a router port to it.
 - **It can't change anything:** no arm/disarm or other commands, so a stray tap can't silence a rig.
 - **It notices stale data itself:** if it loses the program, it shows a red banner, and rigs that were armed show as alerts.
-- **Night** turns the page red. **Keep on** stops a phone or tablet sleeping (in browsers that support it). On iOS, *Share → Add to Home Screen* opens it full screen like an app.
+- **Night mode** (the moon) turns the page dim red, to keep your night vision. **Keep screen on** stops the screen of the phone, tablet or computer showing the page from going to sleep (in browsers that support it); it reads **Screen stays on** while it works. It has nothing to do with the computer running the monitor, which stays awake by itself. On iOS, *Share → Add to Home Screen* opens it full screen like an app.
 - Up to 20 viewers at once, a few KB/s each.
 - **Your own display:** the page's data is also at `/events` (live) and `/state.json` (a snapshot) for a page, desktop window or script of your own. See [Build your own display](build-a-display.md).
 

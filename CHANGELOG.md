@@ -8,6 +8,13 @@
 - The monitor exits with `ARM_RESTART_EXIT` instead of restarting itself when a supervisor sets it (the Windows launcher), so a restart never leaves a stray copy.
 - A monitor set up from another computer keeps `setup_from_lan = true`, and its web page shows the **Add rigs or change settings** link on other computers too.
 
+**Changed**
+- Web page: the buttons now say **Night mode** (with a moon) and **Keep screen on** (with a phone; it reads **Screen stays on** while it works). Keep screen on is about the device showing the page, not the monitor's computer. On a phone they sit on their own row, so the title isn't cut short.
+
+**Fixed**
+- The fake rig's ASIAIR mode introduced itself as PHD2 and answered PHD2's question, so setup took it for PHD2. It now introduces itself like a real ASIAIR and answers nothing.
+- Windows: the background task now gets the account name from Windows, so it can also be set up from an SSH session (where `USERDOMAIN` is `WORKGROUP`).
+
 ## 0.3.0 (26 November 2026)
 
 **New**

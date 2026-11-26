@@ -47,7 +47,9 @@ body.detail header h1 .back { display: block; }
 .tool { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 5px 9px; font-size: 13px; color: var(--text2); cursor: pointer; }
 .tool[aria-pressed="true"] { border-color: var(--text2); color: var(--text); }
 .tool[hidden] { display: none; }
-@media (max-width: 480px) { #connText { display: none; } header h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+.tool { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tool svg { width: 1em; height: 1em; flex: none; }
+@media (max-width: 480px) { #connText { display: none; } header h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } header { flex-wrap: wrap; row-gap: 8px; } .tools { order: 3; width: 100%; } .tools .tool { flex: 1; justify-content: center; } }
 
 .banner { display: none; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--row-alert); color: var(--red-lt); font-weight: 600; }
 .banner.show { display: block; }
@@ -192,8 +194,8 @@ body.detail .reports { display: none; }
   <h1><button class="back" id="back" aria-label="Back to all rigs">‹</button><span id="title">Astro Rig Monitor</span></h1>
   <div class="status"><span class="dot" id="conn"></span><span id="connText">Connecting…</span></div>
   <div class="tools">
-    <button class="tool" id="wake" aria-pressed="false" hidden title="Stop this screen going to sleep">Keep on</button>
-    <button class="tool" id="night" aria-pressed="false" title="Red night view">Night</button>
+    <button class="tool" id="wake" aria-pressed="false" hidden title="Stop this phone, tablet or computer's screen going to sleep while the page is open"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="1.5" width="8" height="13" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 12.2h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span id="wakeText">Keep screen on</span></button>
+    <button class="tool" id="night" aria-pressed="false" title="Dim red view that keeps your night vision"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 1.8a6.3 6.3 0 1 0 3.7 10.6A5.2 5.2 0 0 1 10.5 1.8z" fill="currentColor"/></svg><span>Night mode</span></button>
   </div>
 </header>
 <div class="banner" id="banner"></div>
@@ -608,12 +610,16 @@ $("night").addEventListener("click", () => setNight(!document.documentElement.cl
 setNight(load("night") === "1");
 
 let lock = null;
+function showWake(on) {
+  $("wake").setAttribute("aria-pressed", on);
+  $("wakeText").textContent = on ? "Screen stays on" : "Keep screen on";
+}
 async function setWake(on) {
   try {
-    if (on) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { if (!document.hidden) $("wake").setAttribute("aria-pressed", "false"); }); }
+    if (on) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { if (!document.hidden) showWake(false); }); }
     else if (lock) { await lock.release(); lock = null; }
-    $("wake").setAttribute("aria-pressed", on);
-  } catch (e) { $("wake").setAttribute("aria-pressed", "false"); }
+    showWake(on);
+  } catch (e) { showWake(false); }
 }
 if ("wakeLock" in navigator) {
   $("wake").hidden = false;

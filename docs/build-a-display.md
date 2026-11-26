@@ -50,7 +50,7 @@ A rig with `"kind": "tracker"` (a tracker without guiding) has no RMS: show `tra
 
 No code. Open `http://<computer>:8080` and:
 
-- **iPhone / iPad:** *Share → Add to Home Screen*, then open it from the home screen: it runs full screen like an app. Tap **Keep on** so it doesn't sleep, and **Night** for a red screen.
+- **iPhone / iPad:** *Share → Add to Home Screen*, then open it from the home screen: it runs full screen like an app. Tap **Keep screen on** so it doesn't sleep, and **Night mode** for a red screen.
 - **Android:** Chrome menu → *Add to Home screen* (or *Install app*). Same buttons.
 - **A Raspberry Pi with a touch screen** (or any Linux box with a monitor), as a kiosk that starts on boot:
 
