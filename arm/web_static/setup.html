@@ -416,7 +416,8 @@ async function start() {
     document.querySelectorAll("input[name=mode]").forEach((r) => r.addEventListener("change", showMode));
     if (state.error) document.querySelector("input[name=mode][value=new]").checked = true;
   }
-  if (!state.exists && location.port) $("webPort").value = location.port;   // keep the port it's on now
+  if (state.web_port) $("webPort").value = state.web_port;                  // starting again: keep its port
+  else if (location.port) $("webPort").value = location.port;              // keep the port it's on now
   $("ntfyUrl").value = "https://ntfy.sh/" + randomTopic();
   setNtfyHint();
   $("ntfyUrl").addEventListener("input", setNtfyHint);
