@@ -69,3 +69,4 @@ schtasks /Query /TN "Astro Rig Monitor" 2>$null
 if ($LASTEXITCODE -eq 0) { throw "task still there" }
 if (-not (Test-Path "$Data\config.toml")) { throw "settings were removed" }
 Write-Host "all good"
+exit 0
