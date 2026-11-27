@@ -3,15 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111110">
+<meta name="theme-color" content="#0f1216">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <title>Astro Rig Monitor setup</title>
 <style>
 :root {
-  --bg: #111110; --row: #1c1c1b; --line: #2c2c2a; --field: #262624;
-  --text: #f1efe8; --text2: #b4b2a9; --muted: #888780;
-  --green: #639922; --green-lt: #97c459; --amber-lt: #fac775; --red: #e24b4a; --red-lt: #f7c1c1;
-  --accent: #378add;
+  /* colours from the tools' shared design (dgsgc.github.io design/suite.css) */
+  --bg: #0f1216; --row: #171b21; --line: #2a3038; --field: #12161b; --btn: #1d2229;
+  --text: #e6e9ee; --text2: #a9b2bf; --muted: #8a94a3;
+  --green: #4fb06d; --green-lt: #6fcf87; --amber-lt: #fac775; --red: #e5534b; --red-lt: #f7c1c1;
+  --accent: var(--green);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -23,7 +24,9 @@ body {
 }
 main { max-width: 720px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 22px 0 4px; }
-h2 { font-size: 16px; margin: 0 0 10px; }
+h2 { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text2); margin: 0 0 12px; }
+h1 { display: flex; align-items: center; gap: 10px; }
+h1 .logo { width: 22px; height: 22px; flex: none; color: var(--green); }
 p { margin: 6px 0; }
 .lead { color: var(--text2); margin-bottom: 18px; }
 .hint { color: var(--muted); font-size: 13px; }
@@ -43,10 +46,10 @@ input[type=text], input[type=number], input[type=url], select {
 input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--text); }
 .check input { margin-top: 3px; }
-button { font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line);
+button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 14px; cursor: pointer; }
 button:hover { border-color: var(--text2); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 10px 20px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #08130c; font-weight: 600; padding: 10px 20px; }
 button.link { background: none; border: 0; color: var(--muted); padding: 4px 6px; }
 button:disabled { opacity: .5; cursor: default; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -57,8 +60,8 @@ button:disabled { opacity: .5; cursor: default; }
 .skyPreview { display: block; max-width: 100%; margin-top: 8px; border-radius: 6px; }
 .msg { margin: 12px 0; padding: 10px 12px; border-radius: 10px; display: none; }
 .msg.show { display: block; }
-.msg.bad { background: #501313; color: var(--red-lt); }
-.msg.good { background: #1f3310; color: var(--green-lt); }
+.msg.bad { background: #4a1716; color: var(--red-lt); }
+.msg.good { background: #17301f; color: var(--green-lt); }
 .choice { display: grid; gap: 8px; margin-top: 10px; }
 [hidden] { display: none !important; }
 code { background: var(--field); border-radius: 4px; padding: 1px 5px; font-size: 13px; word-break: break-all; }
@@ -67,7 +70,7 @@ a { color: var(--accent); }
 </head>
 <body>
 <main>
-  <h1>Astro Rig Monitor setup</h1>
+  <h1><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="currentColor" stroke-width="3"/></svg>Astro Rig Monitor setup</h1>
   <p class="lead">Add your rigs and choose how you want to be told when guiding goes wrong.
     The monitor only listens to your rigs: nothing is ever sent to them.</p>
 

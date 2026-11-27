@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+**Changed**
+- **A common look with the other tools** ([shared design](https://github.com/dgsgc/dgsgc.github.io/tree/main/design)): the web page, setup page and morning report use the same colours, and the crosshair icon sits by the title. Main buttons on the setup page are green, and its section headings are small capitals.
+- **The morning report uses the computer's own font**, so it no longer loads fonts from Google and looks the same without the internet.
+
 ## 0.3.2 (26 November 2026)
 
 With Mac app `mac-v0.1.2` and Windows app `win-v0.1.1`.

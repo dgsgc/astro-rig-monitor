@@ -163,9 +163,9 @@ class Actions:
         svg = qrcode.make(address, image_factory=qrcode.image.svg.SvgPathImage, box_size=12, border=2).to_string().decode()
         page = paths.DATA / "phone.html"
         page.write_text(f"""<!doctype html><meta charset="utf-8"><title>Open on your phone</title>
-<style>body{{font:16px system-ui,sans-serif;background:#111;color:#eee;text-align:center;padding:30px}}
+<style>body{{font:16px system-ui,sans-serif;background:#0f1216;color:#e6e9ee;text-align:center;padding:30px}}
 .qr{{background:#fff;display:inline-block;padding:12px;border-radius:10px}}.qr svg{{width:260px;height:260px}}
-code{{font-size:20px;background:#222;padding:4px 10px;border-radius:6px}}p{{color:#bbb;max-width:520px;margin:16px auto}}</style>
+code{{font-size:20px;background:#1d2229;padding:4px 10px;border-radius:6px}}p{{color:#a9b2bf;max-width:520px;margin:16px auto}}</style>
 <h1>Open the monitor on your phone</h1>
 <div class="qr">{svg}</div>
 <p>Point your phone's camera at the code and tap the link, or type this address into its browser:</p>

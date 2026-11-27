@@ -518,13 +518,14 @@ def rig_section(a, T0, T1):
 CSS = """
 :root {
   /* Night-sky instrument panel: one dark look (it's read at night), rigs stacked as panels,
-     a shared time axis so the nights line up. */
-  --bg: #0e0f11; --panel: #16181b; --panel-2: #1d2024; --line: #2a2e33;
-  --text: #eceae4; --text-2: #b3b0a8; --muted: #85837c;
-  --ok: #7fb24a; --warn: #f0a530; --alert: #e5534b; --idle: #3a3d42;
-  --ra: #4b95e3; --dec: #e0693d; --accent: #9db8d6;
-  --display: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
-  --body: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+     a shared time axis so the nights line up. Colours and font from the tools' shared design
+     (dgsgc.github.io design/suite.css); --accent here marks pauses and dawn on the charts. */
+  --bg: #0f1216; --panel: #171b21; --panel-2: #1d2229; --line: #2a3038;
+  --text: #e6e9ee; --text-2: #a9b2bf; --muted: #8a94a3;
+  --ok: #4fb06d; --warn: #f0a530; --alert: #e5534b; --idle: #3a3f47;
+  --ra: #4b95e3; --dec: #e0693d; --accent: #9db8d6; --tool: #4fb06d;
+  --display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color-scheme: dark;
 }
 body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 15px; line-height: 1.45; }
@@ -534,7 +535,8 @@ header.top { display: grid; gap: 6px; margin-bottom: 26px; }
 .backlink { color: var(--text-2); text-decoration: none; font-size: 14px; justify-self: start; padding: 4px 0; margin-bottom: 6px; }
 .backlink:hover, .backlink:focus-visible { color: var(--text); }
 @media print { .backlink { display: none; } }
-.eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tool); display: flex; align-items: center; gap: 8px; }
+.eyebrow svg { width: 18px; height: 18px; flex: none; }
 h1 { font-family: var(--display); font-weight: 600; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.05; margin: 0; text-wrap: balance; }
 .sub { color: var(--text-2); max-width: 70ch; margin: 4px 0 0; }
 .overview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -544,10 +546,10 @@ h1 { font-family: var(--display); font-weight: 600; font-size: clamp(28px, 4.2vw
 .overview b { font-variant-numeric: tabular-nums; }
 .pip { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
 .pip.warn { background: var(--warn); } .pip.alert { background: var(--alert); }
-section.rig { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 22px; display: grid; gap: 18px; }
+section.rig { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; margin-bottom: 22px; display: grid; gap: 18px; }
 .righead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
 h2 { font-family: var(--display); font-weight: 600; font-size: 28px; margin: 0; letter-spacing: -.01em; }
-h3 { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: .02em; color: var(--text-2); margin: 0 0 10px; }
+h3 { font-weight: 700; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
 .chip { font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
 .chip.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
 .chip.alert { background: color-mix(in srgb, var(--alert) 22%, transparent); color: #f2a19b; }
@@ -667,12 +669,10 @@ def page(results, title_date):
     what = f"{total_frames:,} guide frames" if guided else "tracker runs"
     return f"""<title>Guiding night {html.escape(title_date)}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <style>{CSS}</style>
 <div class="wrap">
   <header class="top">
-    <div class="eyebrow">Guiding night</div>
+    <div class="eyebrow"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="currentColor" stroke-width="3"/></svg>Guiding night</div>
     <h1>{html.escape(title_date)}</h1>
     <p class="sub">{len(results)} rig{"s" if len(results) != 1 else ""}, {what} from {hm(T0)} to {hm(T1)} ({datetime.fromtimestamp(T0).astimezone().tzname()}). {"Typical total RMS per rig" if guided else "Frames taken per rig"}{" (frames taken for trackers)" if guided and len(guided) < len(results) else ""}:</p>
     <nav class="overview" aria-label="Rigs">{pills}</nav>

@@ -94,9 +94,9 @@ final class SetupWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         let retry = lastURL?.absoluteString ?? ""
         webView.loadHTMLString("""
             <!doctype html><meta charset="utf-8"><style>
-            body{font:15px -apple-system,sans-serif;background:#111;color:#ddd;padding:40px;line-height:1.5}
+            body{font:15px -apple-system,sans-serif;background:#0f1216;color:#e6e9ee;padding:40px;line-height:1.5}
             @media (prefers-color-scheme: light){body{background:#f6f6f6;color:#222}}
-            a{color:#6ab0ff}</style>
+            a{color:#4fb06d}</style>
             <h2>The monitor isn't answering yet</h2>
             <p>It may still be starting. <a href="\(retry)">Try again</a> in a few seconds.</p>
             <p>If it keeps happening, check that <b>Run Monitor</b> is ticked in the menu, and look at

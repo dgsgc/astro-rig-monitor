@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111110">
+<meta name="theme-color" content="#0f1216">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,12 +14,13 @@
 <title>Astro Rig Monitor</title>
 <style>
 :root {
-  --bg: #111110; --row: #1c1c1b; --row-alert: #501313; --line: #2c2c2a;
-  --text: #f1efe8; --text2: #b4b2a9; --muted: #888780; --grey: #5f5e5a;
-  --green: #639922; --green-lt: #97c459;
-  --amber: #ef9f27; --amber-lt: #fac775; --amber-dk: #854f0b;
-  --red: #e24b4a; --red-lt: #f7c1c1; --red-dk: #a32d2d;
-  --ra: #378add; --dec: #d85a30;
+  /* colours from the tools' shared design (dgsgc.github.io design/suite.css) */
+  --bg: #0f1216; --row: #171b21; --row-alert: #4a1716; --line: #2a3038;
+  --text: #e6e9ee; --text2: #a9b2bf; --muted: #8a94a3; --grey: #5c6470;
+  --green: #4fb06d; --green-lt: #6fcf87;
+  --amber: #f0a530; --amber-lt: #fac775; --amber-dk: #854f0b;
+  --red: #e5534b; --red-lt: #f7c1c1; --red-dk: #a32d2d;
+  --ra: #4b95e3; --dec: #e0693d;
   --gutter: max(16px, env(safe-area-inset-left));
   color-scheme: dark;
 }
@@ -39,6 +40,8 @@ header { display: flex; align-items: center; gap: 12px; padding: 14px 0 10px; }
 header h1 { font-size: 17px; font-weight: 600; margin: 0; flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
 header h1 .back { display: none; border: 0; background: none; padding: 4px 8px 4px 0; font-size: 22px; line-height: 1; color: var(--text2); cursor: pointer; }
 body.detail header h1 .back { display: block; }
+header h1 .logo { width: 20px; height: 20px; flex: none; color: var(--green); }
+body.detail header h1 .logo { display: none; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--grey); flex: none; }
 .dot.on { background: var(--green); }
 .dot.off { background: var(--red); animation: blink 1s steps(2) infinite; }
@@ -94,7 +97,7 @@ body.detail #overview { display: none; }
 body.detail #detail { display: block; }
 .dhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .badge { font-size: 12px; font-weight: 700; letter-spacing: .5px; border-radius: 6px; padding: 3px 8px; background: var(--line); color: var(--text2); text-transform: uppercase; }
-.badge.ok { background: var(--green); color: #fff; }
+.badge.ok { background: var(--green); color: #08130c; }
 .badge.warn { background: var(--amber); color: #2a1a00; }
 .badge.alert { background: var(--red); color: #fff; animation: blink 0.5s steps(2) infinite; }
 .dstate { color: var(--text2); }
@@ -191,7 +194,7 @@ body.detail .reports { display: none; }
 </head>
 <body>
 <header>
-  <h1><button class="back" id="back" aria-label="Back to all rigs">‹</button><span id="title">Astro Rig Monitor</span></h1>
+  <h1><button class="back" id="back" aria-label="Back to all rigs">‹</button><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="currentColor" stroke-width="3"/></svg><span id="title">Astro Rig Monitor</span></h1>
   <div class="status"><span class="dot" id="conn"></span><span id="connText">Connecting…</span></div>
   <div class="tools">
     <button class="tool" id="wake" aria-pressed="false" hidden title="Stop this phone, tablet or computer's screen going to sleep while the page is open"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="1.5" width="8" height="13" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 12.2h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span id="wakeText">Keep screen on</span></button>

@@ -3,7 +3,7 @@
   "short_name": "Guiding",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#111110",
-  "theme_color": "#111110",
+  "background_color": "#0f1216",
+  "theme_color": "#0f1216",
   "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}]
 }
