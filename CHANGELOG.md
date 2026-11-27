@@ -1,6 +1,8 @@
 # Changes
 
-## Unreleased
+## 0.3.3 (27 November 2026)
+
+With Mac app `mac-v0.1.3` and Windows app `win-v0.1.2`. There's also a project page now: https://dgsgc.github.io/astro-rig-monitor/
 
 **Changed**
 - **A common look with the other tools** ([shared design](https://github.com/dgsgc/dgsgc.github.io/tree/main/design)): the web page, setup page and morning report use the same colours, and the crosshair icon sits by the title. Main buttons on the setup page are green, and its section headings are small capitals.

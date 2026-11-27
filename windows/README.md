@@ -8,7 +8,7 @@ Needs 64-bit Windows 10 or 11.
 
 ## Install
 
-**Download:** [Astro-Rig-Monitor-Setup.exe](https://github.com/dgsgc/astro-rig-monitor/releases/download/win-v0.1.1/Astro-Rig-Monitor-Setup.exe)
+**Download:** [Astro-Rig-Monitor-Setup.exe](https://github.com/dgsgc/astro-rig-monitor/releases/download/win-v0.1.2/Astro-Rig-Monitor-Setup.exe)
 
 1. **Run the installer.** If Windows says **"Windows protected your PC"**, click **More info**, then **Run anyway** (it isn't signed with a paid certificate). It installs for your user only and doesn't need administrator rights.
 2. **Set up:** the setup window opens by itself (an Edge window without tabs; your usual browser if Edge isn't there). Add your rigs (use **Listen to detect its settings** while a rig is guiding), choose your phone alerts, and press **Save and start**.

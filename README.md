@@ -69,8 +69,8 @@ Pick the computer that will run it. You don't need Python or a terminal on a Mac
 
 | Computer | Download |
 |---|---|
-| **Mac** (macOS 13 or later) | [Apple Silicon (M1 and later)](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Apple-Silicon.zip) · [Intel](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Intel.zip) |
-| **Windows** 10 or 11 (64-bit) | [Astro-Rig-Monitor-Setup.exe](https://github.com/dgsgc/astro-rig-monitor/releases/download/win-v0.1.1/Astro-Rig-Monitor-Setup.exe) |
+| **Mac** (macOS 13 or later) | [Apple Silicon (M1 and later)](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.3/Astro-Rig-Monitor-Apple-Silicon.zip) · [Intel](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.3/Astro-Rig-Monitor-Intel.zip) |
+| **Windows** 10 or 11 (64-bit) | [Astro-Rig-Monitor-Setup.exe](https://github.com/dgsgc/astro-rig-monitor/releases/download/win-v0.1.2/Astro-Rig-Monitor-Setup.exe) |
 | **Raspberry Pi** or Linux | one command, below |
 
 Each way runs the same monitor, with the same settings file, web page, alerts and reports.

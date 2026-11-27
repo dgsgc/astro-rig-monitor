@@ -10,8 +10,8 @@ Needs macOS 13 Ventura or later.
 
 | Your Mac | Download |
 |---|---|
-| Apple Silicon (M1 and later) | [Astro-Rig-Monitor-Apple-Silicon.zip](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Apple-Silicon.zip) |
-| Intel | [Astro-Rig-Monitor-Intel.zip](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.2/Astro-Rig-Monitor-Intel.zip) |
+| Apple Silicon (M1 and later) | [Astro-Rig-Monitor-Apple-Silicon.zip](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.3/Astro-Rig-Monitor-Apple-Silicon.zip) |
+| Intel | [Astro-Rig-Monitor-Intel.zip](https://github.com/dgsgc/astro-rig-monitor/releases/download/mac-v0.1.3/Astro-Rig-Monitor-Intel.zip) |
 
 Not sure which? Apple menu → About This Mac: "Chip: Apple M…" is Apple Silicon, "Processor: … Intel" is Intel.
 
