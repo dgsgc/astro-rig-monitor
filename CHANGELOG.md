@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+**Changed**
+- **ESP32 display firmware 0.3.2:** the shared colours, as on the web page (cool dark greys, the same green, amber, red, RA and Dec). Nothing else changed.
+
 ## 0.3.3 (27 November 2026)
 
 With Mac app `mac-v0.1.3` and Windows app `win-v0.1.2`. There's also a project page now: https://dgsgc.github.io/astro-rig-monitor/

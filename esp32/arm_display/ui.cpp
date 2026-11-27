@@ -6,26 +6,26 @@
 #include <new>
 #include "model.h"
 
-// ---- colours (from the mockup) ----
-#define C_BG        0x111110
-#define C_ROW       0x1C1C1B
-#define C_ROW_ALERT 0x501313
-#define C_LINE      0x2C2C2A
-#define C_TEXT      0xF1EFE8
-#define C_TEXT2     0xB4B2A9
-#define C_MUTED     0x888780
-#define C_GREY      0x5F5E5A
-#define C_GREEN     0x639922
-#define C_GREEN_LT  0x97C459
-#define C_AMBER     0xEF9F27
+// ---- colours: from the tools' shared design (dgsgc.github.io design/suite.css), as on the web page.
+#define C_BG        0x0F1216
+#define C_ROW       0x171B21
+#define C_ROW_ALERT 0x4A1716
+#define C_LINE      0x2A3038
+#define C_TEXT      0xE6E9EE
+#define C_TEXT2     0xA9B2BF
+#define C_MUTED     0x8A94A3
+#define C_GREY      0x5C6470
+#define C_GREEN     0x4FB06D
+#define C_GREEN_LT  0x6FCF87
+#define C_AMBER     0xF0A530
 #define C_AMBER_LT  0xFAC775
 #define C_AMBER_DK  0x854F0B
-#define C_RED       0xE24B4A
+#define C_RED       0xE5534B
 #define C_RED_LT    0xF7C1C1
 #define C_RED_MID   0xF09595
 #define C_RED_DK    0xA32D2D
-#define C_RA        0x378ADD
-#define C_DEC       0xD85A30
+#define C_RA        0x4B95E3
+#define C_DEC       0xE0693D
 
 #define SCALE 100   // chart values are hundredths of an arcsecond
 

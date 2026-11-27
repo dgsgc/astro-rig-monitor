@@ -21,7 +21,7 @@ struct RigConfig {
 #include "config_local.h"
 #endif
 
-#define FIRMWARE_VERSION "0.3.1"
+#define FIRMWARE_VERSION "0.3.2"
 #ifndef DISPLAY_ID
 #define DISPLAY_ID       "display_1"    // used in MQTT topics and the client id
 #endif
