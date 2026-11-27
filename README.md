@@ -7,6 +7,8 @@ Keeps an eye on your telescope's autoguiding so you don't have to. It reads the 
 - **Night reports:** each morning, a one-page summary of last night's guiding per rig: RMS through the night, alerts, dithers, and why the plan paused (meridian flip, new target, autofocus, cloud).
 - **Build your own display:** a tablet or Raspberry Pi screen in kiosk mode, your own web page, a desktop window, an ESP32 with LEDs, or Home Assistant. A [step-by-step guide](docs/build-a-display.md) and working examples are included.
 
+**Project page:** [dgsgc.github.io/astro-rig-monitor](https://dgsgc.github.io/astro-rig-monitor/), with screenshots, downloads and a quick start.
+
 **Install it in a few minutes:** [Mac app](#mac) · [Windows app](#windows) · [Raspberry Pi or Linux](#raspberry-pi-and-linux). No programming needed.
 
 **It is read-only.** It only listens to the guiding events the ASIAIR or PHD2 already broadcast on port 4400. It never sends a command to a rig, so it can't disturb a running session. ASIAIR users can optionally let it listen to the app's own port too, for autofocus, filter changes and plan progress ([details](docs/configuration.md#the-asiair-app-port-optional); unofficial, so a future firmware could change it).
