@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Astro Rig Monitor: every ASIAIR rig on one screen</title>
-<meta name="description" content="Free monitor for ASIAIR and PHD2 rigs: all your rigs' guiding on one page, and a phone alert only when something goes wrong. Read-only, for Mac, Windows and Raspberry Pi.">
+<title>Astro Rig Monitor: all your rigs on one screen</title>
+<meta name="description" content="Free monitor for ASIAIR and N.I.N.A./PHD2 rigs: all your rigs' guiding on one page, and a phone alert only when something goes wrong. Read-only, for Mac, Windows and Raspberry Pi.">
 <meta property="og:title" content="Astro Rig Monitor">
-<meta property="og:description" content="Every ASIAIR rig on one screen, and a phone alert only when guiding goes wrong.">
+<meta property="og:description" content="All your ASIAIR and N.I.N.A. rigs on one screen, and a phone alert only when guiding goes wrong.">
 <meta property="og:image" content="https://dgsgc.github.io/astro-rig-monitor/img/desktop-overview.jpg">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%234fb06d' stroke-width='3'/%3E%3Cpath d='M16 2v8M16 22v8M2 16h8M22 16h8' stroke='%234fb06d' stroke-width='3'/%3E%3C/svg%3E">
 <style>
@@ -124,8 +124,8 @@ footer a { color: var(--text2); }
 
 <main>
 <div class="wrap hero">
-  <h1>Every ASIAIR rig on one screen.<br>An alert only when guiding goes wrong.</h1>
-  <p class="lead">Running more than one ASIAIR means flicking between rigs in the app to check each one is still guiding. Astro Rig Monitor watches them all at once, and tells your phone when one needs you.</p>
+  <h1>All your rigs on one screen.<br>An alert only when guiding goes wrong.</h1>
+  <p class="lead">Running more than one ASIAIR or N.I.N.A. rig means checking each one in turn to see it's still guiding. Astro Rig Monitor watches them all at once, side by side, and tells your phone when one needs you.</p>
   <div class="dl" id="dl">
     <a class="btn primary" data-os="mac" href="#install">Download for Mac</a>
     <a class="btn" data-os="win" href="#install">Download for Windows</a>
@@ -133,24 +133,24 @@ footer a { color: var(--text2); }
   </div>
   <p class="small">Free and open source. Read-only: it never sends a command to your rigs.</p>
   <div class="devices">
-    <div class="tablet"><div class="screen"><img src="img/desktop-overview.jpg" width="1600" height="1000" alt="Three rigs on one page on a tablet: one guiding well, one with RMS creeping up, one that has lost its star"></div></div>
-    <div class="handset"><div class="screen"><img src="img/phone-overview.jpg" width="600" height="1298" alt="The same rigs on a phone"></div></div>
+    <div class="tablet"><div class="screen"><img src="img/desktop-overview.jpg" width="1600" height="1000" alt="Four rigs on one page on a tablet: two guiding well, one with RMS creeping up, one that has lost its star"></div></div>
+    <div class="handset"><div class="screen"><img src="img/phone-kkro-alert.jpg" width="600" height="1615" alt="The rig in alert, opened on a phone: guide graph, stats and sky camera"></div></div>
   </div>
-  <p class="cap">On a tablet and a phone. A demo night: one rig guiding well, one with RMS creeping up (warning), one that has lost its guide star (alert).</p>
+  <p class="cap">A demo night with four rigs: two guiding well, one with RMS creeping up (warning), one that has lost its guide star (alert), opened on the phone.</p>
 </div>
 
 <section id="why">
   <div class="wrap">
-    <h2>Why it's useful with several ASIAIRs</h2>
+    <h2>Why it's useful with several rigs</h2>
     <div class="points">
-      <div class="point"><h3>All rigs at a glance</h3><p>Total RMS, RA/Dec, guide-star SNR and a 10-minute trend for every rig, on your phone, tablet or computer. No switching between devices in the app.</p></div>
+      <div class="point"><h3>All rigs at a glance</h3><p>Total RMS, RA/Dec, guide-star SNR and a 10-minute trend for every rig, on your phone, tablet or computer. ASIAIR and N.I.N.A. rigs side by side, with no switching between apps or devices.</p></div>
       <div class="point"><h3>Alerts only when it matters</h3><p>RMS too high, star lost, guiding stopped and not back, a rig gone offline. One bad frame never alerts. Free phone alerts through ntfy, or Discord.</p></div>
       <div class="point"><h3>Knows a routine pause from a problem</h3><p>Dithers, autofocus, filter changes, gotos and meridian flips don't set it off. An autofocus or flip that never finishes does.</p></div>
       <div class="point"><h3>Quiet when the night's done</h3><p>A rig disarms itself when its plan finishes or the sun comes up, so you're not woken by a rig that's simply parked.</p></div>
       <div class="point"><h3>A report every morning</h3><p>One page per night: each rig's guiding through the night, every alert, and why each pause happened.</p></div>
-      <div class="point"><h3>Safe to run on a live plan</h3><p>It only listens to the guiding the ASIAIR already broadcasts, so it can't upset a running plan. Use the ASIAIR app as normal alongside it.</p></div>
+      <div class="point"><h3>Safe to run on a live plan</h3><p>It only listens to the guiding events the ASIAIR or PHD2 already broadcasts, so it can't upset a running plan or sequence. Keep using the ASIAIR app or N.I.N.A. as normal.</p></div>
     </div>
-    <p class="small" style="margin-top:22px">Also works with PHD2 on its own or driven by N.I.N.A., and with a remote observatory over Tailscale or another VPN.</p>
+    <p class="small" style="margin-top:22px">Works with any ASIAIR, and with PHD2 on its own or driven by N.I.N.A. Remote observatories work too, over Tailscale or another VPN.</p>
   </div>
 </section>
 
@@ -160,8 +160,8 @@ footer a { color: var(--text2); }
     <p class="muted">Add it to your Home Screen and it opens like an app. Tap a rig for its guide graph.</p>
     <div class="grid3">
       <div><div class="shot phone"><img src="img/phone-overview.jpg" width="600" height="1298" alt="All rigs on a phone" loading="lazy"></div><p class="cap">All rigs</p></div>
-      <div><div class="shot phone"><img src="img/phone-kkro-alert.jpg" width="600" height="1526" alt="A rig in alert on a phone" loading="lazy"></div><p class="cap">A rig in alert</p></div>
-      <div><div class="shot phone"><img src="img/phone-sqa55-detail.jpg" width="600" height="1800" alt="A rig's guide graph on a phone" loading="lazy"></div><p class="cap">A rig's guide graph and stats</p></div>
+      <div><div class="shot phone"><img src="img/phone-kkro-alert.jpg" width="600" height="1615" alt="A rig in alert on a phone" loading="lazy"></div><p class="cap">A rig in alert</p></div>
+      <div><div class="shot phone"><img src="img/phone-sqa55-detail.jpg" width="600" height="1883" alt="A rig's guide graph on a phone" loading="lazy"></div><p class="cap">A rig's guide graph and stats</p></div>
     </div>
   </div>
 </section>
@@ -175,7 +175,7 @@ footer a { color: var(--text2); }
       <tr><td><span class="tag alert">ALERT</span></td><td>RMS above your alert level; star lost or guiding stopped and not back; a task that's taking too long; settling failing again and again; the rig gone offline.</td></tr>
     </table>
     <p class="small" style="margin-top:14px">You set the levels for each rig. A good start is a warning at half your imaging pixel scale.</p>
-    <div class="shot" style="margin-top:26px"><img src="img/desktop-102ed-detail.jpg" width="1600" height="1176" alt="A rig's detail page: guide graph with dithers, stats, target and sky camera" loading="lazy"></div>
+    <div class="shot" style="margin-top:26px"><img src="img/desktop-102ed-detail.jpg" width="1600" height="1175" alt="A rig's detail page: guide graph with dithers, stats, target and sky camera" loading="lazy"></div>
     <p class="cap">A rig's detail page: the last 100 frames with dithers shaded, the stats, and, from the ASIAIR's app port (optional), the target, sub count, filter and last autofocus.</p>
   </div>
 </section>
@@ -185,9 +185,9 @@ footer a { color: var(--text2); }
     <h2>Optional: a desk display</h2>
     <p class="muted">A small touch screen with a warning light, for beside the sofa. The firmware is included for a low-cost ESP32 board.</p>
     <div class="grid3">
-      <div><div class="shot"><img src="img/esp32-overview.jpg" width="720" height="500" alt="Desk display: all rigs" loading="lazy"></div></div>
-      <div><div class="shot"><img src="img/esp32-sqa55-graph.jpg" width="720" height="500" alt="Desk display: guide graph" loading="lazy"></div></div>
-      <div><div class="shot"><img src="img/esp32-kkro-sky.jpg" width="720" height="500" alt="Desk display: sky camera" loading="lazy"></div></div>
+      <div><div class="shot"><img src="img/esp32-overview.jpg" width="720" height="499" alt="Desk display: all rigs" loading="lazy"></div></div>
+      <div><div class="shot"><img src="img/esp32-sqa55-graph.jpg" width="720" height="499" alt="Desk display: guide graph" loading="lazy"></div></div>
+      <div><div class="shot"><img src="img/esp32-kkro-sky.jpg" width="720" height="499" alt="Desk display: sky camera" loading="lazy"></div></div>
     </div>
     <p class="small" style="margin-top:12px">Or use a tablet, a Raspberry Pi screen or Home Assistant: <a href="https://github.com/dgsgc/astro-rig-monitor/blob/main/docs/build-a-display.md">build your own display</a>.</p>
   </div>

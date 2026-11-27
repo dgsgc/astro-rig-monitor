@@ -13,7 +13,7 @@ Keeps an eye on your telescope's autoguiding so you don't have to. It reads the 
 
 ## Screenshots
 
-These are from a demo night with three rigs: one guiding well (green), one with RMS creeping up (amber, WARNING) and one that has lost its guide star (red, ALERT).
+These are from a demo night with four rigs: two guiding well (green), one with RMS creeping up (amber, WARNING) and one that has lost its guide star (red, ALERT).
 
 **Desktop.** Every rig at a glance, with total RMS, RA/Dec and a 10-minute trend against the warn and alert levels:
 
