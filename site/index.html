@@ -10,7 +10,7 @@
 <meta property="og:image" content="https://dgsgc.github.io/astro-rig-monitor/img/desktop-overview.jpg">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%234fb06d' stroke-width='3'/%3E%3Cpath d='M16 2v8M16 22v8M2 16h8M22 16h8' stroke='%234fb06d' stroke-width='3'/%3E%3C/svg%3E">
 <style>
-:root {
+:root { color-scheme: dark;
   --bg: #0e1013; --panel: #171a1f; --line: #262a31; --text: #e8eaed; --text2: #a3a9b3;
   --ok: #4fb06d; --warn: #e0a43a; --alert: #e25b4b; --link: #7cb8ff;
   --r: 12px; --max: 1080px;
@@ -89,6 +89,22 @@ header nav a:hover { color: var(--text); }
 .steps li::before { content: counter(st); position: absolute; left: 0; top: -2px; width: 32px; height: 32px; border-radius: 50%;
   display: grid; place-items: center; font-weight: 700; font-size: 15px; color: var(--ok); background: rgba(79,176,109,.14); border: 1px solid rgba(79,176,109,.35); }
 .steps p { color: var(--text2); margin: 0; }
+
+/* settings pop-up */
+dialog#settings { width: min(720px, calc(100vw - 32px)); max-height: min(86vh, 900px); overflow: auto; padding: 0; border: 1px solid var(--line); border-radius: var(--r);
+  background: linear-gradient(180deg, #181c22, #121519); color: var(--text); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+dialog#settings::backdrop { background: rgba(5,7,9,.7); backdrop-filter: blur(2px); }
+.dlg-head { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px;
+  background: #181c22; border-bottom: 1px solid var(--line); }
+.dlg-head h2 { margin: 0; font-size: 21px; }
+.dlg-x { background: none; border: 1px solid var(--line); color: var(--text2); border-radius: 8px; width: 34px; height: 34px; font-size: 22px; line-height: 1; cursor: pointer; }
+.dlg-x:hover { color: var(--text); }
+.dlg-body { padding: 16px 20px 22px; font-size: 15.5px; }
+.dlg-body h3 { margin: 20px 0 8px; font-size: 15px; color: var(--ok); text-transform: uppercase; letter-spacing: .06em; }
+.dlg-body dl { margin: 0; display: grid; grid-template-columns: 11em 1fr; gap: 8px 16px; }
+.dlg-body dt { font-weight: 600; }
+.dlg-body dd { margin: 0; color: var(--text2); }
+@media (max-width: 560px) { .dlg-body dl { grid-template-columns: 1fr; gap: 2px; } .dlg-body dd { margin-bottom: 8px; } }
 
 /* install */
 .install { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -254,10 +270,55 @@ footer a { color: var(--text2); }
       <li><h3>Get alerts on your phone</h3><p>Install the free <a href="https://ntfy.sh">ntfy</a> app and subscribe to the topic the setup page gives you. <b>Send Test Notification</b> in the menu checks it works.</p></li>
       <li><h3>Put it on your phone</h3><p><b>Open on Your Phone…</b> in the menu shows a QR code. Then Share → <b>Add to Home Screen</b>, and it opens like an app.</p></li>
     </ol>
-    <p class="small" style="margin-top:22px">Optional: add your location so rigs disarm themselves at dawn, an all-sky camera to see if it's cloud, and the ASIAIR app port for target, sub count and autofocus. All the settings are in the <a href="https://github.com/dgsgc/astro-rig-monitor/blob/main/docs/configuration.md">settings guide</a>.</p>
+    <p class="small" style="margin-top:22px">Optional: add your location so rigs disarm themselves at dawn, an all-sky camera to see if it's cloud, and the ASIAIR app port for target, sub count and autofocus. All the settings are in the <a href="https://github.com/dgsgc/astro-rig-monitor/blob/main/docs/configuration.md" id="openSettings">settings guide</a>.</p>
   </div>
 </section>
 </main>
+
+
+<dialog id="settings" aria-labelledby="setTitle">
+  <div class="dlg-head"><h2 id="setTitle">Settings at a glance</h2><button type="button" class="dlg-x" id="closeSettings" aria-label="Close">×</button></div>
+  <div class="dlg-body">
+    <p class="muted"><b>Add Rigs or Change Settings…</b> in the menu covers rigs, levels, alerts, location and sky camera. For the rest, <b>More → Edit Settings File…</b>, then <b>Restart Monitor</b>.</p>
+
+    <h3>Levels</h3>
+    <dl>
+      <dt>WARN, ALERT</dt><dd>Total RMS (arcsec) above which a rig is in WARN or ALERT. A new level has to hold for 20 s before it counts, so one bad frame never alerts.</dd>
+      <dt>Dithers</dt><dd>Always left out of the figure the levels use, so dithering never sets off an alert.</dd>
+    </dl>
+
+    <h3>When it alerts</h3>
+    <dl>
+      <dt>Star lost, guiding stopped</dt><dd>After 20 s, unless the plan or sequencer stopped it on purpose.</dd>
+      <dt>Planned pauses</dt><dd>Gotos, autofocus and flips show as “Paused by plan” and alert only if guiding isn't back in time: 10 min for an ASIAIR, 5 min for N.I.N.A.</dd>
+      <dt>Stuck tasks</dt><dd>Calibration, or an autofocus or filter change that runs longer than 10 min.</dd>
+      <dt>Settle failures</dt><dd>3 dithers in a row that fail to settle.</dd>
+      <dt>Offline</dt><dd>A rig that can't be reached for 30 s while it's armed.</dd>
+    </dl>
+
+    <h3>Extras</h3>
+    <dl>
+      <dt>Location</dt><dd>Latitude and longitude (town level is plenty). A rig that stops as the sun comes up disarms itself and shows “Finished at dawn” instead of alerting all morning.</dd>
+      <dt>All-sky camera</dt><dd>The address of its latest picture, shown on the rig's page and refreshed at once on an alert, so you can see if it's cloud. Dropbox share links work.</dd>
+      <dt>ASIAIR app port</dt><dd>Also listen on the ASIAIR's port 4700 for target, sub count, filter and autofocus, and to tell an autofocus from a problem. Listen-only.</dd>
+    </dl>
+
+    <h3>N.I.N.A. and PHD2</h3>
+    <dl>
+      <dt>Guide scale</dt><dd>PHD2 reports pixels, so it needs the guide scale (Listen asks PHD2 for it, or see N.I.N.A.'s Guider panel).</dd>
+      <dt>Image downloads</dt><dd>PHD2 can pause while N.I.N.A. downloads an image, so allow 60 s without frames.</dd>
+      <dt>Remote observatory</dt><dd>Reach the PC over Tailscale or another VPN and use its VPN address.</dd>
+    </dl>
+
+    <h3>Alerts and reports</h3>
+    <dl>
+      <dt>Phone alerts</dt><dd>ntfy (free app) or a Discord webhook. ALERT only, or WARN too. Optional reminders while a rig stays in ALERT, and a note when it's clear.</dd>
+      <dt>Morning report</dt><dd>At 08:00, one page per night with each rig's guiding, every alert and why each pause happened. Nights are kept 30 days.</dd>
+      <dt>Web page</dt><dd>Port 8080 on your home network. It can't change anything. From outside, use a VPN, never an open router port.</dd>
+    </dl>
+    <p class="small" style="margin-top:18px">Every setting, with its default: <a href="https://github.com/dgsgc/astro-rig-monitor/blob/main/docs/configuration.md">the full settings guide on GitHub</a>.</p>
+  </div>
+</dialog>
 
 <footer>
   <div class="wrap">
@@ -305,6 +366,15 @@ document.getElementById("copy").addEventListener("click", async e => {
   try { await navigator.clipboard.writeText(document.getElementById("cmd").textContent); e.target.textContent = "Copied"; }
   catch (err) { e.target.textContent = "Select and copy the line above"; }
 });
+
+// Settings guide: a pop-up on this page; the link still goes to GitHub without JavaScript.
+(function () {
+  const d = document.getElementById("settings"), a = document.getElementById("openSettings");
+  if (!d || !a || typeof d.showModal !== "function") return;
+  a.addEventListener("click", (e) => { e.preventDefault(); d.showModal(); d.scrollTop = 0; });
+  document.getElementById("closeSettings").addEventListener("click", () => d.close());
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
+})();
 </script>
 </body>
 </html>
